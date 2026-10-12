@@ -7,6 +7,7 @@ import MildToast from "./components/MildToast.jsx";
 import { ThemeContext } from "./context/ThemeContext.jsx";
 import { STORAGE_KEYS } from "./lib/constants.js";
 import { useLocalStorage } from "./hooks/useLocalStorage.js";
+import { useBrowserFatigueDetection } from "./hooks/useBrowserFatigueDetection.js";
 import { average, getBreakMinutes, getSetupAvailability, normalizeHistory } from "./lib/wellbeing.js";
 
 function createSession() {
@@ -54,7 +55,6 @@ export default function App() {
   const [banner, setBanner] = useState("");
   const [snoozeCount, setSnoozeCount] = useState(0);
   const [escalateOnNext, setEscalateOnNext] = useState(false);
-  const [fatigueStatus, setFatigueStatus] = useState({ fatigueDetected: false, connected: false });
   const [breakCredit, setBreakCredit] = useState(0);
   const [breakContext, setBreakContext] = useState({ noSnooze: false, reason: "manual", beforeBurnRate: 0 });
   const [notificationState, setNotificationState] = useState(null);
@@ -73,6 +73,7 @@ export default function App() {
       avgSessionSeconds: average(seed.map((item) => item.durationSeconds || 0))
     };
   }, [sessions]);
+  const fatigueStatus = useBrowserFatigueDetection(fatigueOptIn && Boolean(profile));
 
   const adaptiveBurnRate = useMemo(() => getAdaptiveBurnRate(session, baseline), [session, baseline]);
   const effectiveBurnRate = Math.max(apiBurnRate, adaptiveBurnRate, fatigueStatus.fatigueDetected ? 0.6 : 0);
@@ -191,7 +192,8 @@ export default function App() {
         if (apiRefreshRef.current !== requestId) {
           return;
         }
-        const adjusted = Math.max(0, Number((Number(data.burn_rate ?? 0) - breakCredit).toFixed(2)));
+        const rawScore = Number(data.burn_rate ?? data.burnoutRate ?? data.workloadBalanceScore ?? 0);
+        const adjusted = Math.max(0, Number((rawScore - breakCredit).toFixed(2)));
         setApiBurnRate(adjusted);
         setBurnRate(Math.max(adjusted, adaptiveBurnRate));
         if (breakCredit > 0) {
@@ -230,23 +232,6 @@ export default function App() {
   useEffect(() => {
     setBurnRate(Math.max(apiBurnRate, adaptiveBurnRate, fatigueStatus.fatigueDetected ? 0.6 : 0));
   }, [apiBurnRate, adaptiveBurnRate, fatigueStatus.fatigueDetected]);
-
-  useEffect(() => {
-    if (!fatigueOptIn || !profile) {
-      return;
-    }
-
-    const poll = () => {
-      fetch("/api/fatigue/status")
-        .then((response) => response.json())
-        .then((data) => setFatigueStatus(data))
-        .catch(() => setFatigueStatus({ fatigueDetected: false, connected: false }));
-    };
-
-    poll();
-    const interval = setInterval(poll, 30000);
-    return () => clearInterval(interval);
-  }, [fatigueOptIn, profile]);
 
   useEffect(() => {
     if (!profile || breakOpen) {

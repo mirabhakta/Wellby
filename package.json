@@ -6,10 +6,16 @@
   "scripts": {
     "dev": "nodemon server/index.js",
     "build": "vite build",
-    "start": "cross-env NODE_ENV=production node server/index.js"
+    "start": "cross-env NODE_ENV=production node server/index.js",
+    "test": "node --test"
   },
   "dependencies": {
     "@chrisoakman/chessboardjs": "^1.0.0",
+    "@tensorflow-models/face-landmarks-detection": "^1.0.6",
+    "@tensorflow/tfjs-backend-cpu": "^4.22.0",
+    "@tensorflow/tfjs-backend-webgl": "^4.22.0",
+    "@tensorflow/tfjs-converter": "^4.22.0",
+    "@tensorflow/tfjs-core": "^4.22.0",
     "chart.js": "^4.4.2",
     "chess.js": "^1.0.0",
     "express": "^4.19.2",

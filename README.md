@@ -14,9 +14,9 @@ Wellby is a friendly AI-powered wellbeing companion for tech industry workers. I
 
 - Frontend: React + Tailwind CSS
 - Backend: Node.js + Express
-- Local AI services:
-  - Burnout prediction proxy for `usmanbvp/Employees-Burnout-Analysis-and-Prediction`
-  - Facial fatigue proxy for `IgorMoriera/Fatigue_Detection_with_Python`
+- In-repo AI logic:
+  - JavaScript burnout/workload heuristic (`POST /api/burnout/predict`)
+  - Browser-local fatigue detection (MediaPipe FaceMesh via TensorFlow.js)
 
 ## Included features
 
@@ -25,7 +25,7 @@ Wellby is a friendly AI-powered wellbeing companion for tech industry workers. I
 - Adaptive flow engine that builds a baseline over the first 3 sessions
 - Burnout risk meter with warm status copy and weekly trend chart
 - Three-tier burnout alert system with toast, banner, modal-style escalation, and snoozes
-- Opt-in fatigue detection polling with a local-only privacy notice
+- Opt-in browser-local fatigue detection with a local-only privacy notice
 - Break Mode with a 60-second mindful breathing moment
 - Built-in Snake, Chess, Tic Tac Toe, and simplified UNO mini-games
 - Local persistence for onboarding, burnout history, sessions, and game scores
@@ -33,19 +33,11 @@ Wellby is a friendly AI-powered wellbeing companion for tech industry workers. I
 ## Local development
 
 1. Clone this repo.
-2. Clone the burnout prediction service:
-   - Repository: [usmanbvp/Employees-Burnout-Analysis-and-Prediction](https://github.com/usmanbvp/Employees-Burnout-Analysis-and-Prediction)
-   - `pip install -r requirements.txt`
-   - `python app.py --port 5001`
-3. Clone the fatigue detection service:
-   - Repository: [IgorMoriera/Fatigue_Detection_with_Python](https://github.com/IgorMoriera/Fatigue_Detection_with_Python)
-   - `pip install -r requirements.txt`
-   - `python fatigue_service.py --port 5002`
-4. In this repo, install dependencies and start the development server:
+2. Install dependencies and start the development server:
    - `npm install`
    - `npm run dev`
-5. Open [http://localhost:3000](http://localhost:3000).
-6. Complete onboarding and start your first Wellby session.
+3. Open [http://localhost:3000](http://localhost:3000).
+4. Complete onboarding and start your first Wellby session.
 
 ## Deployment
 
@@ -72,7 +64,8 @@ The Express server serves the Vite production build from `dist/` and listens on 
 - `POST /api/burnout/predict`
 - `GET /api/fatigue/status`
 
-The backend proxies the two Python microservices and falls back gracefully if either service is unavailable during local setup or deployment.
+- `POST /api/burnout/predict` is computed locally in the Node app and does not call an external burnout service.
+- `GET /api/fatigue/status` is a compatibility endpoint that reports browser-local fatigue detection guidance. Real fatigue analysis runs only in the user's browser after opt-in.
 
 ## NPM packages used
 
@@ -85,5 +78,5 @@ The backend proxies the two Python microservices and falls back gracefully if ei
 ## Notes
 
 - Weekly burnout history, session summaries, break logs, and game scores are stored in `localStorage`.
-- The fatigue detection toggle only polls the local service when the user opts in.
+- Fatigue detection runs locally in the browser when the user opts in; webcam frames never leave the device.
 - After each completed break, Wellby applies a `-0.1` reducing factor to the next burnout score, with a floor of `0.0`.
