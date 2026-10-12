@@ -2,7 +2,13 @@
 
 Work well. Rest well. Be well.
 
-Wellby is a friendly AI-powered wellbeing companion for tech industry workers. It tracks how you work, learns your baseline pace, estimates burnout risk, and nudges you toward restorative breaks with a breathing exercise and a built-in game lounge.
+## Live Demo
+
+Try the deployed Wellby app:
+
+[Open the live Wellby app](https://wellby-t1f8.onrender.com/)
+
+Wellby is a friendly AI-powered wellbeing companion for tech industry workers. It tracks how you work, learns your baseline pace, estimates burnout risk, and nudges you toward restorative breaks.
 
 ## Stack
 
@@ -35,11 +41,24 @@ Wellby is a friendly AI-powered wellbeing companion for tech industry workers. I
    - Repository: [IgorMoriera/Fatigue_Detection_with_Python](https://github.com/IgorMoriera/Fatigue_Detection_with_Python)
    - `pip install -r requirements.txt`
    - `python fatigue_service.py --port 5002`
-4. In this repo:
+4. In this repo, install dependencies and start the development server:
    - `npm install`
    - `npm run dev`
-5. Open [http://localhost:3000](http://localhost:3000)
+5. Open [http://localhost:3000](http://localhost:3000).
 6. Complete onboarding and start your first Wellby session.
+
+## Deployment
+
+The production app is deployed on Render:
+
+[https://wellby-t1f8.onrender.com/](https://wellby-t1f8.onrender.com/)
+
+Render uses the following commands:
+
+- Build command: `npm ci && npm run build`
+- Start command: `NODE_ENV=production node server/index.js`
+
+The Express server serves the Vite production build from `dist/` and listens on the port provided by the hosting platform.
 
 ## Scripts
 
@@ -53,7 +72,7 @@ Wellby is a friendly AI-powered wellbeing companion for tech industry workers. I
 - `POST /api/burnout/predict`
 - `GET /api/fatigue/status`
 
-The backend proxies the two Python microservices and falls back gracefully if either service is unavailable during local setup.
+The backend proxies the two Python microservices and falls back gracefully if either service is unavailable during local setup or deployment.
 
 ## NPM packages used
 
