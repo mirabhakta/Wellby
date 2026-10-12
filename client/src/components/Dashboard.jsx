@@ -41,6 +41,7 @@ export default function Dashboard({
   profile,
   session,
   burnRate,
+  predictionState,
   statusText,
   breakMinutes,
   history,
@@ -64,6 +65,13 @@ export default function Dashboard({
     session.elapsedSeconds > 0 ? ((session.actions / session.elapsedSeconds) * 60).toFixed(1) : "0.0";
   const statusPill = getStatusPill(colors, burnRate);
   const { label: statusLabel, ...statusPillStyles } = statusPill;
+  const moodLabels = {
+    1: "Very low / exhausted",
+    2: "Low energy",
+    3: "Neutral / okay",
+    4: "Good energy",
+    5: "Energized / well"
+  };
 
   return (
     <div className="min-h-screen px-4 py-6 font-body sm:px-6 lg:px-8" style={{ background: colors.dashBg, color: colors.secondaryText }}>
@@ -157,6 +165,18 @@ export default function Dashboard({
                 Complete
               </button>
             </div>
+            {session.activeTask ? (
+              <div className="mt-3 rounded-2xl px-4 py-3 text-sm" style={{ background: colors.secondary }}>
+                <div className="font-bold">Active task: {session.activeTask.name}</div>
+                <div style={{ color: colors.muted }}>
+                  In progress • started{" "}
+                  {new Date(session.activeTask.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                </div>
+              </div>
+            ) : null}
+            <p className="mt-2 text-xs" style={{ color: colors.muted }}>
+              Start task clears the input on purpose so you can quickly queue your next task name.
+            </p>
 
             <div className="mt-6 grid gap-4 md:grid-cols-3">
               {[
@@ -173,11 +193,15 @@ export default function Dashboard({
 
             <div className="mt-6">
               <p className="text-sm font-bold uppercase tracking-[0.18em]" style={{ color: colors.muted }}>Mood check-in</p>
+              <p className="mt-2 text-sm" style={{ color: colors.muted }}>
+                1 = very low/exhausted · 3 = neutral/okay · 5 = energized/well
+              </p>
               <div className="mt-3 flex flex-wrap gap-3">
                 {[1, 2, 3, 4, 5].map((score) => (
                   <button
                     key={score}
                     onClick={() => onMoodSelect(score)}
+                    aria-label={`Mood ${score}: ${moodLabels[score]}`}
                     className="rounded-full px-4 py-3 text-lg font-bold"
                     style={{
                       background: session.moodScore === score ? colors.primary : colors.secondary,
@@ -218,6 +242,11 @@ export default function Dashboard({
               <p className="text-sm font-bold uppercase tracking-[0.18em]" style={{ color: colors.muted }}>Break Recommendation</p>
               <h3 className="mt-2 font-display text-2xl">A {breakMinutes}-minute pause could help.</h3>
               <p className="mt-2 text-sm leading-7" style={{ color: colors.muted }}>{statusText}</p>
+              {predictionState?.status === "unavailable" ? (
+                <div className="mt-3 rounded-2xl px-4 py-3 text-sm font-semibold" style={{ background: colors.secondary }}>
+                  {predictionState.message}
+                </div>
+              ) : null}
               {notificationState ? (
                 <div className="mt-3 rounded-2xl px-4 py-3 text-sm font-semibold" style={{ background: colors.secondary }}>
                   {notificationState === "high"

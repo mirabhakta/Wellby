@@ -8,7 +8,14 @@ import { ThemeContext } from "./context/ThemeContext.jsx";
 import { STORAGE_KEYS } from "./lib/constants.js";
 import { useLocalStorage } from "./hooks/useLocalStorage.js";
 import { useBrowserFatigueDetection } from "./hooks/useBrowserFatigueDetection.js";
-import { average, getBreakMinutes, getSetupAvailability, normalizeHistory } from "./lib/wellbeing.js";
+import {
+  average,
+  clampMoodScore,
+  getBreakMinutes,
+  getMoodFatigueContribution,
+  getSetupAvailability,
+  normalizeHistory
+} from "./lib/wellbeing.js";
 
 function createSession() {
   return {
@@ -59,9 +66,11 @@ export default function App() {
   const [breakContext, setBreakContext] = useState({ noSnooze: false, reason: "manual", beforeBurnRate: 0 });
   const [notificationState, setNotificationState] = useState(null);
   const [lastApiUpdatedAt, setLastApiUpdatedAt] = useState(0);
+  const [predictionState, setPredictionState] = useState({ status: "ready", message: "" });
   const apiRefreshRef = useRef(0);
   const activeToastIdRef = useRef(null);
   const escalateOnNextRef = useRef(false);
+  const breakStartedAtRef = useRef(null);
 
   const baseline = useMemo(() => {
     if (sessions.length < 3) {
@@ -96,10 +105,14 @@ export default function App() {
   }
 
   function triggerFullBreakMode({ noSnooze, reason }) {
+    if (breakOpen) {
+      return;
+    }
     dismissToast();
     setBanner(noSnooze ? "Wellby is stepping in - your burn rate is high. Let's take a proper break." : "You've snoozed twice - Wellby thinks it's really time now. Let's recharge!");
     setNotificationState("high");
     setBreakContext({ noSnooze, reason, beforeBurnRate: effectiveBurnRate });
+    breakStartedAtRef.current = Date.now();
     setBreakOpen(true);
   }
 
@@ -140,6 +153,9 @@ export default function App() {
   }
 
   useEffect(() => {
+    if (breakOpen) {
+      return undefined;
+    }
     const timer = setInterval(() => {
       setSession((current) => ({
         ...current,
@@ -147,22 +163,23 @@ export default function App() {
       }));
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [breakOpen]);
 
   useEffect(() => {
-    if (!profile) {
+    if (!profile || breakOpen) {
       return;
     }
 
     const averageTaskSeconds =
       average(session.completedTasks.map((task) => task.durationSeconds)) || baseline?.avgTaskSeconds || 2400;
+    const moodFatigue = getMoodFatigueContribution(session.moodScore);
     const burnoutPayload = {
       mental_fatigue_score: Number(
         Math.min(
           10,
           Math.max(
             0,
-            (6 - session.moodScore) * 1.4 +
+            moodFatigue +
               Math.min(4, session.elapsedSeconds / 3600) +
               Math.max(0, (averageTaskSeconds - (baseline?.avgTaskSeconds || averageTaskSeconds)) / 600)
           )
@@ -179,46 +196,62 @@ export default function App() {
     const requestId = Date.now();
     apiRefreshRef.current = requestId;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4000);
-
-    fetch("/api/burnout/predict", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(burnoutPayload),
-      signal: controller.signal
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        if (apiRefreshRef.current !== requestId) {
-          return;
-        }
-        const rawScore = Number(data.burn_rate ?? data.burnoutRate ?? data.workloadBalanceScore ?? 0);
-        const adjusted = Math.max(0, Number((rawScore - breakCredit).toFixed(2)));
-        setApiBurnRate(adjusted);
-        setBurnRate(Math.max(adjusted, adaptiveBurnRate));
-        if (breakCredit > 0) {
-          setBreakCredit(0);
-        }
-        setLastApiUpdatedAt(Date.now());
-        setHistory((current) =>
-          normalizeHistory([
-            ...current.filter((entry) => entry.sessionId !== session.startedAt),
-            { sessionId: session.startedAt, burnRate: Math.max(adjusted, adaptiveBurnRate), timestamp: new Date().toISOString() }
-          ])
-        );
+    const requestDelay = setTimeout(() => {
+      const timeout = setTimeout(() => controller.abort(), 4000);
+      fetch("/api/burnout/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(burnoutPayload),
+        signal: controller.signal
       })
-      .catch(() => {
-        return;
-      })
-      .finally(() => clearTimeout(timeout));
+        .then((response) => response.json())
+        .then((data) => {
+          if (apiRefreshRef.current !== requestId) {
+            return;
+          }
+          if (data?.fallback) {
+            setPredictionState({
+              status: "unavailable",
+              message: "Wellness prediction is temporarily unavailable. We'll keep using your local pacing signals."
+            });
+            return;
+          }
+          const rawScore = Number(data.burn_rate ?? data.burnoutRate ?? data.workloadBalanceScore ?? 0);
+          const adjusted = Math.max(0, Number((rawScore - breakCredit).toFixed(2)));
+          setPredictionState({ status: "ready", message: "" });
+          setApiBurnRate(adjusted);
+          setBurnRate(Math.max(adjusted, adaptiveBurnRate));
+          if (breakCredit > 0) {
+            setBreakCredit(0);
+          }
+          setLastApiUpdatedAt(Date.now());
+          setHistory((current) =>
+            normalizeHistory([
+              ...current.filter((entry) => entry.sessionId !== session.startedAt),
+              { sessionId: session.startedAt, burnRate: Math.max(adjusted, adaptiveBurnRate), timestamp: new Date().toISOString() }
+            ])
+          );
+        })
+        .catch((error) => {
+          if (error?.name === "AbortError" || apiRefreshRef.current !== requestId) {
+            return;
+          }
+          setPredictionState({
+            status: "unavailable",
+            message: "Wellness prediction is temporarily unavailable. We'll keep using your local pacing signals."
+          });
+        })
+        .finally(() => clearTimeout(timeout));
+    }, 350);
 
     return () => {
+      clearTimeout(requestDelay);
       controller.abort();
-      clearTimeout(timeout);
     };
   }, [
     profile,
-    session.elapsedSeconds,
+    breakOpen,
+    Math.floor(session.elapsedSeconds / 30),
     session.completedTasks,
     session.actions,
     session.moodScore,
@@ -259,6 +292,8 @@ export default function App() {
   }, [effectiveBurnRate, fatigueStatus.fatigueDetected, profile, breakOpen, notificationState, lastApiUpdatedAt]);
 
   function completeCurrentSession() {
+    const breakDurationSeconds = breakStartedAtRef.current ? Math.max(0, Math.floor((Date.now() - breakStartedAtRef.current) / 1000)) : 0;
+    breakStartedAtRef.current = null;
     const taskDurations = session.completedTasks.map((task) => task.durationSeconds);
     const summary = {
       id: session.startedAt,
@@ -276,7 +311,16 @@ export default function App() {
     setEscalateOnNext(false);
     escalateOnNextRef.current = false;
     clearAllNotifications();
-    setSession(createSession());
+    setSession((current) => ({
+      ...current,
+      startedAt: current.startedAt + breakDurationSeconds * 1000,
+      activeTask: current.activeTask
+        ? {
+            ...current.activeTask,
+            startedAt: current.activeTask.startedAt + breakDurationSeconds * 1000
+          }
+        : null
+    }));
   }
 
   function handleTaskStart() {
@@ -339,7 +383,7 @@ export default function App() {
         onTaskInputChange={(value) => setSession((current) => ({ ...current, taskInput: value }))}
         onTaskStart={handleTaskStart}
         onTaskComplete={handleTaskComplete}
-        onMoodSelect={(score) => setSession((current) => ({ ...current, moodScore: score }))}
+        onMoodSelect={(score) => setSession((current) => ({ ...current, moodScore: clampMoodScore(score) }))}
         mode={mode}
         onToggleMode={toggleMode}
         activeTheme={theme}
@@ -348,6 +392,7 @@ export default function App() {
         onStartBreak={() => triggerFullBreakMode({ noSnooze: false, reason: "manual" })}
         banner={banner}
         notificationState={notificationState}
+        predictionState={predictionState}
       />
       {breakOpen ? (
         <BreakMode

@@ -15,6 +15,21 @@ export function getSetupAvailability(setup) {
   return setup === "wfh" || setup === "hybrid" ? 1 : 0;
 }
 
+export function clampMoodScore(score) {
+  const parsed = Number(score);
+  if (!Number.isFinite(parsed)) {
+    return 3;
+  }
+  return Math.min(5, Math.max(1, Math.round(parsed)));
+}
+
+export function getMoodFatigueContribution(moodScore) {
+  const boundedMood = clampMoodScore(moodScore);
+  // Mood is a 1-5 check-in where lower mood should raise fatigue.
+  // This keeps the inverse relationship while avoiding extreme swings.
+  return Number((((5 - boundedMood) / 4) * 2.8).toFixed(2));
+}
+
 export function getFriendlyStatus(burnRate) {
   if (burnRate < 0.3) {
     return { label: "You're doing great! 🌱", tone: "green" };
