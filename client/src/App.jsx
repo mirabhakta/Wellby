@@ -60,7 +60,6 @@ export default function App() {
   const [breakLogs, setBreakLogs] = useLocalStorage(STORAGE_KEYS.breakLogs, []);
   const [session, setSession] = useState(createSession);
   const [apiBurnRate, setApiBurnRate] = useState(0.18);
-  const [burnRate, setBurnRate] = useState(0.18);
   const [breakOpen, setBreakOpen] = useState(false);
   const [banner, setBanner] = useState("");
   const [snoozeCount, setSnoozeCount] = useState(0);
@@ -204,7 +203,6 @@ export default function App() {
     breakCreditRef.current = 0;
 
     setApiBurnRate(adjusted);
-    setBurnRate(Math.max(adjusted, adaptiveBurnRate));
     setHistory((current) =>
       normalizeHistory([
         ...current.filter((entry) => entry.sessionId !== session.startedAt),
@@ -223,10 +221,6 @@ export default function App() {
     session.startedAt,
     adaptiveBurnRate
   ]);
-
-  useEffect(() => {
-    setBurnRate(Math.max(apiBurnRate, adaptiveBurnRate, fatigueStatus.fatigueDetected ? 0.6 : 0));
-  }, [apiBurnRate, adaptiveBurnRate, fatigueStatus.fatigueDetected]);
 
   useEffect(() => {
     if (!profile || breakOpen) {
@@ -307,7 +301,6 @@ export default function App() {
     lastBreakAtRef.current = Date.now();
     breakCreditRef.current = 0.1;
     setApiBurnRate((current) => Math.max(0, Number((current - 0.1).toFixed(2))));
-    setBurnRate((current) => Math.max(0, Number((current - 0.1).toFixed(2))));
     setSnoozeCount(0);
     clearAllNotifications();
     setSession((current) => ({

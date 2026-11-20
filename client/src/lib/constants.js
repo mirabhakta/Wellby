@@ -1,6 +1,5 @@
 export const STORAGE_KEYS = {
   profile: "wellby.profile",
-  theme: "wellby.theme",
   history: "wellby.burnHistory",
   sessions: "wellby.sessions",
   fatigueOptIn: "wellby.fatigueOptIn",
