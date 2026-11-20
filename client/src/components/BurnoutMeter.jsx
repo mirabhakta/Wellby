@@ -1,38 +1,62 @@
+import { useContext } from "react";
+import { ThemeContext } from "../context/ThemeContext.jsx";
+
 export const WORKLOAD_LEVELS = [
-  { max: 0.33, label: "Light week",    color: "bg-green-400",  text: "text-green-700",  ring: "ring-green-300"  },
-  { max: 0.66, label: "Moderate load", color: "bg-yellow-400", text: "text-yellow-700", ring: "ring-yellow-300" },
-  { max: 1.00, label: "Heavy week",    color: "bg-orange-400", text: "text-orange-700", ring: "ring-orange-300" },
+  { max: 0.33, label: "Light week", tone: "good" },
+  { max: 0.66, label: "Moderate load", tone: "warn" },
+  { max: 1.0, label: "Heavy week", tone: "high" }
 ];
 
 export function getWorkloadLevel(score) {
+  const parsed = Number(score);
+  const bounded = Number.isFinite(parsed) ? parsed : 0;
+
   return (
-    WORKLOAD_LEVELS.find((l) => score <= l.max) ??
+    WORKLOAD_LEVELS.find((level) => bounded <= level.max) ??
     WORKLOAD_LEVELS[WORKLOAD_LEVELS.length - 1]
   );
 }
 
 /**
  * Props:
- *   score  — number 0–1  (formerly "burnoutScore")
+ *   score  — number 0–1 (the dashboard passes its current burn rate here)
  *   label? — override the level label
  */
 export default function WorkloadBalanceMeter({ score = 0, label }) {
-  const level = getWorkloadLevel(score);
-  const pct   = Math.round(score * 100);
+  const { colors } = useContext(ThemeContext);
+  const parsed = Number(score);
+  const bounded = Number.isFinite(parsed) ? Math.min(1, Math.max(0, parsed)) : 0;
+  const level = getWorkloadLevel(bounded);
+  const pct = Math.round(bounded * 100);
   const displayLabel = label ?? level.label;
+  const fillColor =
+    level.tone === "good" ? colors.burnGood : level.tone === "warn" ? colors.burnWarn : colors.burnHigh;
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-600">Work-pattern load</span>
-        <span className={`text-sm font-semibold ${level.text}`}>{displayLabel}</span>
+    <div
+      className="rounded-[28px] p-5 shadow-lg"
+      style={{ background: colors.cardBg, border: `1px solid ${colors.cardBorder}` }}
+    >
+      <div className="mb-4 flex items-center justify-between">
+        <p className="text-sm font-bold uppercase tracking-[0.18em]" style={{ color: colors.muted }}>
+          Work-pattern load
+        </p>
+        <div
+          className="rounded-full border px-3 py-1 text-sm font-bold"
+          style={{ background: colors.secondary, color: colors.secondaryText, borderColor: colors.cardBorder }}
+        >
+          {pct}%
+        </div>
       </div>
 
-      {/* Bar */}
-      <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+      <h3 className="font-display text-2xl" style={{ color: colors.secondaryText }}>
+        {displayLabel}
+      </h3>
+
+      <div className="mt-4 h-3 w-full overflow-hidden rounded-full" style={{ background: colors.secondary }}>
         <div
-          className={`h-full rounded-full transition-all duration-500 ${level.color}`}
-          style={{ width: `${pct}%` }}
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, background: fillColor }}
           role="progressbar"
           aria-valuenow={pct}
           aria-valuemin={0}
@@ -41,9 +65,9 @@ export default function WorkloadBalanceMeter({ score = 0, label }) {
         />
       </div>
 
-      <p className="text-xs text-gray-400">
-        This is a rough, non-clinical indicator of your recent work patterns —
-        not a medical or mental-health assessment.
+      <p className="mt-3 text-xs" style={{ color: colors.muted }}>
+        This is a rough, non-clinical indicator of your recent work patterns — not a medical or mental-health
+        assessment.
       </p>
     </div>
   );
