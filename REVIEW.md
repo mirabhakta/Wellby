@@ -223,7 +223,7 @@ This review doubles as the work list for the first PR
 - [x] 3. Forced-break cooldown so the modal cannot re-open immediately
 - [x] 4. Post-break credit survives until the next server reading
 - [x] 5. Snooze window and escalation tier actually fire
-- [ ] 6. UNO wild cards resolve to a real color
+- [x] 6. UNO wild cards resolve to a real color
 
 Deferred to follow-up PRs: baseline poisoning, real 404s, dynamic `vite`
 import, dependency upgrades, privacy reset, CI/lint/types, dead-code removal
