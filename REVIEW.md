@@ -222,7 +222,7 @@ This review doubles as the work list for the first PR
 - [x] 2. Chess no longer crashes on illegal moves; error boundary added
 - [x] 3. Forced-break cooldown so the modal cannot re-open immediately
 - [x] 4. Post-break credit survives until the next server reading
-- [ ] 5. Snooze window and escalation tier actually fire
+- [x] 5. Snooze window and escalation tier actually fire
 - [ ] 6. UNO wild cards resolve to a real color
 
 Deferred to follow-up PRs: baseline poisoning, real 404s, dynamic `vite`

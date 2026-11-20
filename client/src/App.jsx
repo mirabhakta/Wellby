@@ -8,7 +8,7 @@ import { ThemeContext } from "./context/ThemeContext.jsx";
 import { STORAGE_KEYS } from "./lib/constants.js";
 import { useLocalStorage } from "./hooks/useLocalStorage.js";
 import { useBrowserFatigueDetection } from "./hooks/useBrowserFatigueDetection.js";
-import { FORCED_BREAK_COOLDOWN_MS, isBreakCoolingDown } from "./lib/alerts.js";
+import { FORCED_BREAK_COOLDOWN_MS, SNOOZE_MS, getAlertAction } from "./lib/alerts.js";
 import {
   applyBreakCredit,
   average,
@@ -63,15 +63,13 @@ export default function App() {
   const [breakOpen, setBreakOpen] = useState(false);
   const [banner, setBanner] = useState("");
   const [snoozeCount, setSnoozeCount] = useState(0);
-  const [escalateOnNext, setEscalateOnNext] = useState(false);
   const [alertClock, setAlertClock] = useState(0);
+  const [snoozedUntil, setSnoozedUntil] = useState(0);
   const [breakContext, setBreakContext] = useState({ noSnooze: false, reason: "manual", beforeBurnRate: 0 });
   const [notificationState, setNotificationState] = useState(null);
-  const [lastApiUpdatedAt, setLastApiUpdatedAt] = useState(0);
   const [predictionState, setPredictionState] = useState({ status: "ready", message: "" });
   const apiRefreshRef = useRef(0);
   const activeToastIdRef = useRef(null);
-  const escalateOnNextRef = useRef(false);
   const breakStartedAtRef = useRef(null);
   const lastBreakAtRef = useRef(0);
   const breakCreditRef = useRef(0);
@@ -106,6 +104,8 @@ export default function App() {
     dismissToast();
     setBanner("");
     setNotificationState(null);
+    setSnoozeCount(0);
+    setSnoozedUntil(0);
   }
 
   function triggerFullBreakMode({ noSnooze, reason }) {
@@ -123,12 +123,18 @@ export default function App() {
   function handleSnooze() {
     const newCount = snoozeCount + 1;
     setSnoozeCount(newCount);
+    setSnoozedUntil(Date.now() + SNOOZE_MS);
     dismissToast();
+    setNotificationState(null);
     if (newCount >= 2) {
-      setEscalateOnNext(true);
-      escalateOnNextRef.current = true;
       setBanner("One more check-in and Wellby will ask for a real break.");
     }
+  }
+
+  function handleDismiss() {
+    dismissToast();
+    setNotificationState(null);
+    setSnoozedUntil(Date.now() + SNOOZE_MS);
   }
 
   function showMildToast() {
@@ -141,10 +147,7 @@ export default function App() {
       <MildToast
         burnRate={effectiveBurnRate}
         snoozeCount={snoozeCount}
-        onDismiss={() => {
-          dismissToast();
-          setNotificationState(null);
-        }}
+        onDismiss={handleDismiss}
         onSnooze={handleSnooze}
         onTakeBreak={() => {
           dismissToast();
@@ -226,7 +229,6 @@ export default function App() {
           setPredictionState({ status: "ready", message: "" });
           setApiBurnRate(adjusted);
           setBurnRate(Math.max(adjusted, adaptiveBurnRate));
-          setLastApiUpdatedAt(Date.now());
           setHistory((current) =>
             normalizeHistory([
               ...current.filter((entry) => entry.sessionId !== session.startedAt),
@@ -272,28 +274,39 @@ export default function App() {
       return;
     }
 
-    if (effectiveBurnRate < 0.3) {
+    const action = getAlertAction({
+      burnRate: effectiveBurnRate,
+      fatigueDetected: fatigueStatus.fatigueDetected,
+      notificationState,
+      snoozeCount,
+      snoozedUntil,
+      lastBreakAt: lastBreakAtRef.current,
+      now: Date.now()
+    });
+
+    if (action.type === "clear") {
       clearAllNotifications();
       return;
     }
 
-    if (effectiveBurnRate >= 0.6 || fatigueStatus.fatigueDetected) {
-      if (isBreakCoolingDown({ now: Date.now(), lastBreakAt: lastBreakAtRef.current })) {
-        return;
-      }
-      triggerFullBreakMode({ noSnooze: true, reason: "high" });
+    if (action.type === "force-break") {
+      triggerFullBreakMode({ noSnooze: action.noSnooze, reason: action.reason });
       return;
     }
 
-    if (escalateOnNextRef.current && lastApiUpdatedAt > 0) {
-      triggerFullBreakMode({ noSnooze: false, reason: "mild-escalation" });
-      return;
-    }
-
-    if (notificationState !== "mild") {
+    if (action.type === "mild") {
       showMildToast();
     }
-  }, [effectiveBurnRate, fatigueStatus.fatigueDetected, profile, breakOpen, notificationState, lastApiUpdatedAt, alertClock]);
+  }, [
+    effectiveBurnRate,
+    fatigueStatus.fatigueDetected,
+    profile,
+    breakOpen,
+    notificationState,
+    snoozeCount,
+    snoozedUntil,
+    alertClock
+  ]);
 
   useEffect(() => {
     const remaining = FORCED_BREAK_COOLDOWN_MS - (Date.now() - lastBreakAtRef.current);
@@ -304,6 +317,20 @@ export default function App() {
     const timer = setTimeout(() => setAlertClock((current) => current + 1), remaining);
     return () => clearTimeout(timer);
   }, [sessions.length]);
+
+  useEffect(() => {
+    if (!snoozedUntil) {
+      return undefined;
+    }
+
+    const remaining = snoozedUntil - Date.now();
+    if (remaining <= 0) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => setSnoozedUntil(0), remaining);
+    return () => clearTimeout(timer);
+  }, [snoozedUntil]);
 
   function completeCurrentSession() {
     const breakDurationSeconds = breakStartedAtRef.current ? Math.max(0, Math.floor((Date.now() - breakStartedAtRef.current) / 1000)) : 0;
@@ -323,8 +350,6 @@ export default function App() {
     setApiBurnRate((current) => Math.max(0, Number((current - 0.1).toFixed(2))));
     setBurnRate((current) => Math.max(0, Number((current - 0.1).toFixed(2))));
     setSnoozeCount(0);
-    setEscalateOnNext(false);
-    escalateOnNextRef.current = false;
     clearAllNotifications();
     setSession((current) => ({
       ...current,
