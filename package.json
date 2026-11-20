@@ -3,11 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20.19"
+  },
   "scripts": {
     "dev": "nodemon server/index.js",
     "build": "vite build",
     "preview": "vite preview",
     "start": "cross-env NODE_ENV=production node server/index.js",
+    "lint": "eslint .",
     "test": "node --test",
     "test:ui": "vitest run"
   },
@@ -22,16 +26,22 @@
     "express": "^4.19.2",
     "framer-motion": "^12.6.0",
     "helmet": "^8.3.0",
+    "prop-types": "^15.8.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hot-toast": "^2.5.1"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "cross-env": "^7.0.3",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
     "jsdom": "^31.0.1",
     "nodemon": "^3.1.7",
     "postcss": "^8.4.49",

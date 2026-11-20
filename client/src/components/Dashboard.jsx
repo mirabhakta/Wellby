@@ -1,4 +1,5 @@
 import { useContext, useState } from "react";
+import PropTypes from "prop-types";
 import BurnoutMeter from "./BurnoutMeter.jsx";
 import TrendChart from "./TrendChart.jsx";
 import LeafIcon from "./LeafIcon.jsx";
@@ -460,3 +461,62 @@ export default function Dashboard({
     </div>
   );
 }
+
+Dashboard.propTypes = {
+  profile: PropTypes.shape({
+    name: PropTypes.string.isRequired,
+    setup: PropTypes.string,
+    seniority: PropTypes.number,
+    favoriteGame: PropTypes.string,
+    workHours: PropTypes.number
+  }).isRequired,
+  session: PropTypes.shape({
+    active: PropTypes.bool.isRequired,
+    elapsedSeconds: PropTypes.number.isRequired,
+    taskInput: PropTypes.string.isRequired,
+    activeTask: PropTypes.shape({
+      id: PropTypes.number,
+      name: PropTypes.string,
+      startedAt: PropTypes.number
+    }),
+    completedTasks: PropTypes.arrayOf(
+      PropTypes.shape({
+        id: PropTypes.number,
+        name: PropTypes.string,
+        startedAt: PropTypes.number,
+        completedAt: PropTypes.number,
+        durationSeconds: PropTypes.number
+      })
+    ).isRequired,
+    actions: PropTypes.number.isRequired,
+    moodScore: PropTypes.number.isRequired
+  }).isRequired,
+  burnRate: PropTypes.number.isRequired,
+  statusText: PropTypes.string.isRequired,
+  breakMinutes: PropTypes.number.isRequired,
+  history: PropTypes.array.isRequired,
+  fatigueOptIn: PropTypes.bool.isRequired,
+  fatigueStatus: PropTypes.shape({
+    connected: PropTypes.bool,
+    fatigueDetected: PropTypes.bool,
+    status: PropTypes.string,
+    warning: PropTypes.string
+  }).isRequired,
+  selfReported: PropTypes.bool.isRequired,
+  onTaskInputChange: PropTypes.func.isRequired,
+  onTaskStart: PropTypes.func.isRequired,
+  onTaskComplete: PropTypes.func.isRequired,
+  onStartSession: PropTypes.func.isRequired,
+  onEndSession: PropTypes.func.isRequired,
+  onMoodSelect: PropTypes.func.isRequired,
+  mode: PropTypes.string.isRequired,
+  onToggleMode: PropTypes.func.isRequired,
+  activeTheme: PropTypes.string.isRequired,
+  onSetTheme: PropTypes.func.isRequired,
+  onToggleFatigue: PropTypes.func.isRequired,
+  onStartBreak: PropTypes.func.isRequired,
+  onClearData: PropTypes.func.isRequired,
+  feedbackUrl: PropTypes.string.isRequired,
+  banner: PropTypes.string.isRequired,
+  notificationState: PropTypes.string
+};

@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 const baseProps = {
   profile: { name: "Test", setup: "wfh", seniority: 2, favoriteGame: "snake" },
   session: {
+    active: true,
     elapsedSeconds: 60,
     actions: 2,
     completedTasks: [],
@@ -20,9 +21,13 @@ const baseProps = {
   statusText: "Sustainable pace",
   breakMinutes: 10,
   fatigueOptIn: false,
+  fatigueStatus: { connected: false, fatigueDetected: false, status: "disabled" },
+  selfReported: false,
   onTaskInputChange() {},
   onTaskStart() {},
   onTaskComplete() {},
+  onStartSession() {},
+  onEndSession() {},
   onMoodSelect() {},
   mode: "light",
   onToggleMode() {},
@@ -30,6 +35,8 @@ const baseProps = {
   onSetTheme() {},
   onToggleFatigue() {},
   onStartBreak() {},
+  onClearData() {},
+  feedbackUrl: "https://example.com/feedback",
   banner: "",
   notificationState: null
 };

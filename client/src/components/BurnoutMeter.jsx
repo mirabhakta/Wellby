@@ -1,4 +1,5 @@
 import { useContext } from "react";
+import PropTypes from "prop-types";
 import { ThemeContext } from "../context/ThemeContext.jsx";
 
 export const WORKLOAD_LEVELS = [
@@ -72,3 +73,8 @@ export default function WorkloadBalanceMeter({ score = 0, label }) {
     </div>
   );
 }
+
+WorkloadBalanceMeter.propTypes = {
+  score: PropTypes.number,
+  label: PropTypes.string
+};

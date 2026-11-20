@@ -1,3 +1,5 @@
+import PropTypes from "prop-types";
+
 export default function LeafIcon({ className = "", primary = "var(--wellby-primary)", secondary = "var(--wellby-secondary)" }) {
   return (
     <svg className={className} width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -9,3 +11,9 @@ export default function LeafIcon({ className = "", primary = "var(--wellby-prima
     </svg>
   );
 }
+
+LeafIcon.propTypes = {
+  className: PropTypes.string,
+  primary: PropTypes.string,
+  secondary: PropTypes.string
+};

@@ -82,7 +82,7 @@ export function getAlertAction({
       return { type: "capped" };
     }
 
-    return { type: "force-break", noSnooze: true, reason: "high" };
+    return { type: "force-break", reason: "high" };
   }
 
   if (now < snoozedUntil) {
@@ -94,7 +94,7 @@ export function getAlertAction({
       return { type: "capped" };
     }
 
-    return { type: "force-break", noSnooze: false, reason: "mild-escalation" };
+    return { type: "force-break", reason: "mild-escalation" };
   }
 
   if (selfReported && notificationState !== "mild") {

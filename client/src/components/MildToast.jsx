@@ -1,4 +1,5 @@
 import { useContext, useEffect } from "react";
+import PropTypes from "prop-types";
 import { ThemeContext } from "../context/ThemeContext.jsx";
 import LeafIcon from "./LeafIcon.jsx";
 
@@ -78,3 +79,12 @@ export default function MildToast({ burnRate, onDismiss, onSnooze, onTakeBreak, 
     </div>
   );
 }
+
+MildToast.propTypes = {
+  burnRate: PropTypes.number.isRequired,
+  onDismiss: PropTypes.func.isRequired,
+  onSnooze: PropTypes.func.isRequired,
+  onTakeBreak: PropTypes.func.isRequired,
+  snoozeCount: PropTypes.number.isRequired,
+  urgent: PropTypes.bool
+};

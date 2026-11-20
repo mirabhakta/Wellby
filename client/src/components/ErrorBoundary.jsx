@@ -1,4 +1,5 @@
 import { Component } from "react";
+import PropTypes from "prop-types";
 
 /**
  * Last-resort safety net. A crash in one component should not leave the user
@@ -49,3 +50,7 @@ export default class ErrorBoundary extends Component {
     );
   }
 }
+
+ErrorBoundary.propTypes = {
+  children: PropTypes.node
+};

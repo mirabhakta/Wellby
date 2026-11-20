@@ -76,7 +76,6 @@ test("a snoozed alert stays quiet during the snooze window and returns after it"
 test("two snoozes escalate to a full break", () => {
   assert.deepEqual(getAlertAction({ ...base, snoozeCount: 2 }), {
     type: "force-break",
-    noSnooze: false,
     reason: "mild-escalation"
   });
 });
@@ -88,7 +87,6 @@ test("escalation still respects an active snooze window", () => {
 test("a rising high reading forces break mode", () => {
   assert.deepEqual(getAlertAction({ ...base, burnRate: 0.75 }), {
     type: "force-break",
-    noSnooze: true,
     reason: "high"
   });
 });
@@ -114,7 +112,7 @@ test("a mild reading is also quiet right after a break", () => {
 test("detected eye fatigue forces on a rising edge, even at a low score", () => {
   assert.deepEqual(
     getAlertAction({ ...base, burnRate: 0.1, fatigueDetected: true }),
-    { type: "force-break", noSnooze: true, reason: "high" }
+    { type: "force-break", reason: "high" }
   );
 });
 

@@ -1,4 +1,5 @@
 import { useContext, useState } from "react";
+import PropTypes from "prop-types";
 import { motion } from "framer-motion";
 import { ThemeContext } from "../context/ThemeContext.jsx";
 import LeafIcon from "./LeafIcon.jsx";
@@ -164,3 +165,7 @@ export default function OnboardingFlow({ onComplete }) {
     </div>
   );
 }
+
+OnboardingFlow.propTypes = {
+  onComplete: PropTypes.func.isRequired
+};

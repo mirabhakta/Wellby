@@ -1,4 +1,5 @@
 import { useContext, useEffect, useRef } from "react";
+import PropTypes from "prop-types";
 import {
   Chart,
   BarController,
@@ -96,3 +97,7 @@ export default function TrendChart({ history }) {
     </div>
   );
 }
+
+TrendChart.propTypes = {
+  history: PropTypes.array.isRequired
+};

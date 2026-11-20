@@ -1,4 +1,5 @@
 import { useContext, useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import { motion } from "framer-motion";
 import { ThemeContext } from "../context/ThemeContext.jsx";
 import { GAME_OPTIONS } from "../lib/constants.js";
@@ -15,7 +16,7 @@ const GAME_COMPONENTS = {
   uno: UnoGame
 };
 
-export default function BreakMode({ initialGame, onClose, noSnooze, reason, beforeBurnRate, afterBurnRate }) {
+export default function BreakMode({ initialGame, onClose, reason, beforeBurnRate, afterBurnRate }) {
   const { colors } = useContext(ThemeContext);
   const [phase, setPhase] = useState("mindful");
   const [secondsLeft, setSecondsLeft] = useState(60);
@@ -181,3 +182,11 @@ export default function BreakMode({ initialGame, onClose, noSnooze, reason, befo
     </div>
   );
 }
+
+BreakMode.propTypes = {
+  initialGame: PropTypes.string,
+  onClose: PropTypes.func.isRequired,
+  reason: PropTypes.string.isRequired,
+  beforeBurnRate: PropTypes.number.isRequired,
+  afterBurnRate: PropTypes.number.isRequired
+};
