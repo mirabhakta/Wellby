@@ -50,9 +50,11 @@ export default function BreakMode({ initialGame, onClose, noSnooze, reason, befo
   const breakMessage =
     reason === "manual"
       ? "You chose to pause before things piled up. Let's use the time well."
-      : noSnooze
+      : reason === "high"
         ? "Wellby is stepping in - your burn rate is high. Let's take a proper break."
-        : "You've snoozed twice - Wellby thinks it's really time now. Let's recharge!";
+        : reason === "self-report"
+          ? "You told us you were running on empty. Let's make this pause count."
+          : "You've snoozed twice - Wellby thinks it's really time now. Let's recharge!";
 
   return (
     <div className="fixed inset-0 z-50 overflow-auto px-4 py-8 backdrop-blur-md" style={{ background: colors.dashBg, color: colors.secondaryText }}>
@@ -147,7 +149,7 @@ export default function BreakMode({ initialGame, onClose, noSnooze, reason, befo
               </div>
               <h2 className="mt-4 font-display text-5xl">Recharged!</h2>
               <p className="mt-3 text-lg" style={{ color: colors.muted }}>
-                Your break is logged and Wellby is applying a lighter burn-rate estimate while the next refresh loads.
+                Your break is logged. Wellby is applying a lighter burn-rate estimate as you return to work.
               </p>
               <div className="mt-8 grid gap-4 md:grid-cols-2">
                 <div className="rounded-[24px] p-5" style={{ background: colors.secondary }}>

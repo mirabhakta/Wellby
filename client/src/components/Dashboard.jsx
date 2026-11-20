@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import BurnoutMeter from "./BurnoutMeter.jsx";
 import TrendChart from "./TrendChart.jsx";
 import LeafIcon from "./LeafIcon.jsx";
@@ -45,9 +45,13 @@ export default function Dashboard({
   breakMinutes,
   history,
   fatigueOptIn,
+  fatigueStatus,
+  selfReported,
   onTaskInputChange,
   onTaskStart,
   onTaskComplete,
+  onStartSession,
+  onEndSession,
   onMoodSelect,
   mode,
   onToggleMode,
@@ -59,11 +63,18 @@ export default function Dashboard({
   notificationState
 }) {
   const { colors } = useContext(ThemeContext);
+  const [confirmingEnd, setConfirmingEnd] = useState(false);
   const elapsed = formatDuration(session.elapsedSeconds);
   const actionsPerMinute =
     session.elapsedSeconds > 0 ? ((session.actions / session.elapsedSeconds) * 60).toFixed(1) : "0.0";
   const statusPill = getStatusPill(colors, burnRate);
   const { label: statusLabel, ...statusPillStyles } = statusPill;
+
+  function finishEnd(selfReport) {
+    setConfirmingEnd(false);
+    onEndSession(selfReport);
+  }
+
   const moodLabels = {
     1: "Very low / exhausted",
     2: "Low energy",
@@ -139,6 +150,69 @@ export default function Dashboard({
                 {statusLabel}
               </div>
             </div>
+
+            <div
+              className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3"
+              style={{ background: colors.secondary }}
+            >
+              <div className="text-sm font-bold">
+                {session.active ? "Auto-tracking this session" : "Session paused"}
+                <span className="ml-2 text-xs font-semibold" style={{ color: colors.muted }}>
+                  {session.active
+                    ? "Pauses after 10 minutes without activity"
+                    : "Start again, or just begin a task"}
+                </span>
+              </div>
+              {session.active ? (
+                <button
+                  onClick={() => setConfirmingEnd(true)}
+                  className="rounded-full px-4 py-2 text-sm font-bold"
+                  style={{ background: colors.breakBtn, color: colors.breakBtnText }}
+                >
+                  End session
+                </button>
+              ) : (
+                <button
+                  onClick={onStartSession}
+                  className="rounded-full px-4 py-2 text-sm font-bold"
+                  style={{ background: colors.primary, color: colors.primaryText }}
+                >
+                  Start session
+                </button>
+              )}
+            </div>
+
+            {confirmingEnd && session.active ? (
+              <div className="mb-4 rounded-2xl px-4 py-3" style={{ background: colors.secondary }}>
+                <p className="text-sm font-bold">How did that session feel?</p>
+                <p className="mt-1 text-xs" style={{ color: colors.muted }}>
+                  This is the fallback signal when the camera misses fatigue.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {[
+                    { id: "fine", label: "Fine" },
+                    { id: "pushed", label: "Pushed through" },
+                    { id: "exhausted", label: "Running on empty" }
+                  ].map((option) => (
+                    <button
+                      key={option.id}
+                      onClick={() => finishEnd(option.id)}
+                      className="rounded-full px-4 py-2 text-sm font-bold"
+                      style={{ background: colors.cardBg, color: colors.secondaryText }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setConfirmingEnd(false)}
+                    className="rounded-full border px-4 py-2 text-sm font-bold"
+                    style={{ borderColor: colors.cardBorder, color: colors.muted }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : null}
 
             <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
               <input
@@ -241,6 +315,14 @@ export default function Dashboard({
               <p className="text-sm font-bold uppercase tracking-[0.18em]" style={{ color: colors.muted }}>Break Recommendation</p>
               <h3 className="mt-2 font-display text-2xl">A {breakMinutes}-minute pause could help.</h3>
               <p className="mt-2 text-sm leading-7" style={{ color: colors.muted }}>{statusText}</p>
+              {selfReported ? (
+                <div
+                  className="mt-3 rounded-2xl px-4 py-3 text-sm font-semibold"
+                  style={{ background: colors.pillWarnBg, color: colors.pillWarnText }}
+                >
+                  You told us you were running on empty. A break is the kind thing to do.
+                </div>
+              ) : null}
               {notificationState ? (
                 <div className="mt-3 rounded-2xl px-4 py-3 text-sm font-semibold" style={{ background: colors.secondary }}>
                   {notificationState === "high"
@@ -274,6 +356,16 @@ export default function Dashboard({
                   {fatigueOptIn ? "Enabled" : "Disabled"}
                 </button>
               </div>
+              {fatigueOptIn ? (
+                <p
+                  className="mt-2 text-xs font-semibold"
+                  style={{ color: fatigueStatus?.connected ? colors.burnGood : colors.muted }}
+                >
+                  {fatigueStatus?.connected
+                    ? "Camera on - frames are analysed on this device and never uploaded."
+                    : fatigueStatus?.warning ?? "Starting the local camera..."}
+                </p>
+              ) : null}
 
               <div className="mt-5 rounded-[24px] p-4" style={{ background: colors.secondary }}>
                 <div className="mb-3 text-sm font-bold uppercase tracking-[0.18em]" style={{ color: colors.muted }}>Appearance</div>
