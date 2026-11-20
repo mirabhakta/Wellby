@@ -59,11 +59,13 @@ export default function Dashboard({
   onSetTheme,
   onToggleFatigue,
   onStartBreak,
+  onClearData,
   banner,
   notificationState
 }) {
   const { colors } = useContext(ThemeContext);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
+  const [confirmingClear, setConfirmingClear] = useState(false);
   const elapsed = formatDuration(session.elapsedSeconds);
   const actionsPerMinute =
     session.elapsedSeconds > 0 ? ((session.actions / session.elapsedSeconds) * 60).toFixed(1) : "0.0";
@@ -398,6 +400,44 @@ export default function Dashboard({
                 >
                   Switch to {mode === "light" ? "dark" : "light"} mode
                 </button>
+              </div>
+
+              <div className="mt-5 rounded-[24px] p-4" style={{ background: colors.secondary }}>
+                <div className="mb-2 text-sm font-bold uppercase tracking-[0.18em]" style={{ color: colors.muted }}>
+                  Your data
+                </div>
+                <p className="text-sm leading-6" style={{ color: colors.muted }}>
+                  No account, no upload. Sessions, moods, and settings live in this browser only.
+                </p>
+                {confirmingClear ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => {
+                        setConfirmingClear(false);
+                        onClearData();
+                      }}
+                      className="rounded-full px-4 py-2 text-sm font-bold"
+                      style={{ background: colors.pillDangerBg, color: colors.pillDangerText }}
+                    >
+                      Yes, delete everything
+                    </button>
+                    <button
+                      onClick={() => setConfirmingClear(false)}
+                      className="rounded-full border px-4 py-2 text-sm font-bold"
+                      style={{ borderColor: colors.cardBorder, color: colors.muted }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmingClear(true)}
+                    className="mt-3 rounded-full border px-4 py-2 text-sm font-bold"
+                    style={{ borderColor: colors.cardBorder, color: colors.secondaryText }}
+                  >
+                    Clear my data
+                  </button>
+                )}
               </div>
             </div>
           </div>

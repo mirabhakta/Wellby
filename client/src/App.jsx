@@ -8,6 +8,7 @@ import { ThemeContext } from "./context/ThemeContext.jsx";
 import { STORAGE_KEYS } from "./lib/constants.js";
 import { useLocalStorage } from "./hooks/useLocalStorage.js";
 import { useBrowserFatigueDetection } from "./hooks/useBrowserFatigueDetection.js";
+import { clearWellbyStorage } from "./lib/storage.js";
 import { FORCED_BREAK_COOLDOWN_MS, SNOOZE_MS, getAlertAction, getForcedBreakCount, isHighReading, recordForcedBreak } from "./lib/alerts.js";
 import { calculateBurnoutScore } from "./lib/burnout.js";
 import {
@@ -352,6 +353,11 @@ export default function App() {
     clearAllNotifications();
   }
 
+  function handleClearData() {
+    clearWellbyStorage();
+    window.location.reload();
+  }
+
   function endSession({ source = "manual", selfReport = null } = {}) {
     if (!session.active) {
       return;
@@ -505,6 +511,7 @@ export default function App() {
         onSetTheme={setTheme}
         onToggleFatigue={() => setFatigueOptIn((current) => !current)}
         onStartBreak={() => triggerFullBreakMode({ noSnooze: false, reason: "manual" })}
+        onClearData={handleClearData}
         banner={banner}
         notificationState={notificationState}
       />

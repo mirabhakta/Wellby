@@ -14,3 +14,24 @@ export function writeStorage(key, value) {
     return;
   }
 }
+
+/**
+ * Removes every key this app owns, including the theme keys that predate
+ * STORAGE_KEYS. Returns the number of keys removed.
+ */
+export function clearWellbyStorage(storage = globalThis.window?.localStorage) {
+  if (!storage) {
+    return 0;
+  }
+
+  const keys = [];
+  for (let index = 0; index < storage.length; index += 1) {
+    const key = storage.key(index);
+    if (key && key.startsWith("wellby")) {
+      keys.push(key);
+    }
+  }
+
+  keys.forEach((key) => storage.removeItem(key));
+  return keys.length;
+}

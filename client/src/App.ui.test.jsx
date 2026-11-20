@@ -89,3 +89,15 @@ test("the daily cap shows a banner instead of interrupting", () => {
   expect(screen.getByText(/three Wellby breaks today/)).toBeTruthy();
   expect(screen.queryByText(/Mindful Moment/)).toBeNull();
 });
+
+test("clearing data removes every key the app owns", () => {
+  scoring.score = 0.1;
+  renderApp();
+  act(() => {});
+
+  fireEvent.click(screen.getByText("Clear my data"));
+  fireEvent.click(screen.getByText("Yes, delete everything"));
+
+  expect(localStorage.getItem("wellby.profile")).toBeNull();
+  expect(Object.keys(localStorage).filter((key) => key.startsWith("wellby"))).toEqual([]);
+});
