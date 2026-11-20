@@ -58,7 +58,7 @@ export default function BreakMode({ initialGame, onClose, reason, beforeBurnRate
           : "You've snoozed twice - Wellby thinks it's really time now. Let's recharge!";
 
   return (
-    <div className="fixed inset-0 z-50 overflow-auto px-4 py-8 backdrop-blur-md" style={{ background: colors.dashBg, color: colors.secondaryText }}>
+    <div className="fixed inset-0 z-50 overflow-auto px-4 py-8 pb-24 backdrop-blur-md" style={{ background: colors.dashBg, color: colors.secondaryText }}>
       <div className="mx-auto max-w-6xl">
         {phase === "mindful" ? (
           <div className="grid min-h-[80vh] place-items-center">
@@ -67,7 +67,7 @@ export default function BreakMode({ initialGame, onClose, reason, beforeBurnRate
                 <LeafIcon className="h-8 w-8" primary={colors.primary} secondary={colors.secondary} />
                 <p className="text-sm font-bold uppercase tracking-[0.22em]" style={{ color: colors.muted }}>Mindful Moment</p>
               </div>
-              <h2 className="mt-3 font-display text-5xl">Let's take a breath together</h2>
+              <h2 className="mt-3 font-display text-4xl sm:text-5xl">Let's take a breath together</h2>
               <p className="mt-4 text-lg" style={{ color: colors.muted }}>{breakMessage}</p>
               <motion.div
                 animate={{ scale: breathStage.scale }}
@@ -120,7 +120,7 @@ export default function BreakMode({ initialGame, onClose, reason, beforeBurnRate
                   Finish break
                 </button>
               </div>
-              <div className="mt-6 grid gap-3 md:grid-cols-4">
+              <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
                 {GAME_OPTIONS.map((game) => (
                   <button
                     key={game.id}
@@ -148,7 +148,7 @@ export default function BreakMode({ initialGame, onClose, reason, beforeBurnRate
                   <span key={`${color}-${index}`} className="h-3 w-3 rounded-full" style={{ background: color }} />
                 ))}
               </div>
-              <h2 className="mt-4 font-display text-5xl">Recharged!</h2>
+              <h2 className="mt-4 font-display text-4xl sm:text-5xl">Recharged!</h2>
               <p className="mt-3 text-lg" style={{ color: colors.muted }}>
                 Your break is logged. Wellby is applying a lighter burn-rate estimate as you return to work.
               </p>

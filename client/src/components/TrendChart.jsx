@@ -86,12 +86,15 @@ export default function TrendChart({ history }) {
   }, [history, colors]);
 
   return (
-    <div className="rounded-[28px] p-5 shadow-lg" style={{ background: colors.cardBg, border: `1px solid ${colors.cardBorder}` }}>
+    <div
+      className="min-w-0 rounded-[28px] p-5 shadow-lg"
+      style={{ background: colors.cardBg, border: `1px solid ${colors.cardBorder}` }}
+    >
       <div className="mb-4">
         <p className="text-sm font-bold uppercase tracking-[0.18em]" style={{ color: colors.muted }}>Weekly Trend</p>
         <h3 className="font-display text-2xl" style={{ color: colors.secondaryText }}>How your week has felt</h3>
       </div>
-      <div className="h-64">
+      <div className="relative h-64 w-full overflow-hidden">
         <canvas ref={canvasRef} />
       </div>
     </div>

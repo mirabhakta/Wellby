@@ -89,16 +89,16 @@ export default function Dashboard({
 
   return (
     <div className="min-h-screen px-4 py-6 font-body sm:px-6 lg:px-8" style={{ background: colors.dashBg, color: colors.secondaryText }}>
-      <div className="mx-auto max-w-7xl pb-20">
+      <div className="mx-auto max-w-7xl pb-28">
         <header
           className="mb-6 flex flex-col gap-4 rounded-[32px] p-6 shadow-glow lg:flex-row lg:items-center lg:justify-between"
           style={{ background: colors.sidebarBg, color: colors.wordmark, border: `1px solid ${colors.sidebarBorder}` }}
         >
-          <div className="flex items-center gap-4">
-            <LeafIcon className="h-12 w-12" primary={colors.primary} secondary={colors.secondary} />
-            <div>
+          <div className="flex min-w-0 items-center gap-4">
+            <LeafIcon className="h-12 w-12 shrink-0" primary={colors.primary} secondary={colors.secondary} />
+            <div className="min-w-0">
               <p className="text-sm font-bold uppercase tracking-[0.22em]" style={{ color: colors.navText }}>Wellby</p>
-              <h1 className="font-display text-4xl">Hey {profile.name}, how are you feeling today?</h1>
+              <h1 className="break-words font-display text-3xl sm:text-4xl">Hey {profile.name}, how are you feeling today?</h1>
               <p className="text-base" style={{ color: colors.tagline }}>Work well. Rest well. Be well.</p>
             </div>
           </div>
@@ -144,13 +144,13 @@ export default function Dashboard({
         ) : null}
 
         <section className="mb-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-[32px] p-6 shadow-lg" style={{ background: colors.cardBg, border: `1px solid ${colors.cardBorder}` }}>
-            <div className="mb-5 flex items-center justify-between">
-              <div>
+          <div className="min-w-0 rounded-[32px] p-6 shadow-lg" style={{ background: colors.cardBg, border: `1px solid ${colors.cardBorder}` }}>
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
                 <p className="text-sm font-bold uppercase tracking-[0.18em]" style={{ color: colors.muted }}>Current Session</p>
                 <h2 className="font-display text-3xl">What are you working on?</h2>
               </div>
-              <div className="rounded-full border px-4 py-2 text-sm font-bold" style={statusPillStyles}>
+              <div className="shrink-0 self-start rounded-full border px-4 py-2 text-sm font-bold sm:self-auto" style={statusPillStyles}>
                 {statusLabel}
               </div>
             </div>
@@ -159,7 +159,7 @@ export default function Dashboard({
               className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3"
               style={{ background: colors.secondary }}
             >
-              <div className="text-sm font-bold">
+              <div className="min-w-0 text-sm font-bold">
                 {session.active ? "Auto-tracking this session" : "Session paused"}
                 <span className="ml-2 text-xs font-semibold" style={{ color: colors.muted }}>
                   {session.active
@@ -312,7 +312,7 @@ export default function Dashboard({
             </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-6">
             <BurnoutMeter score={burnRate} />
 
             <div className="rounded-[28px] p-5 shadow-lg" style={{ background: colors.cardBg, border: `1px solid ${colors.cardBorder}` }}>
