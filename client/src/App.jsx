@@ -9,6 +9,7 @@ import { STORAGE_KEYS } from "./lib/constants.js";
 import { useLocalStorage } from "./hooks/useLocalStorage.js";
 import { useBrowserFatigueDetection } from "./hooks/useBrowserFatigueDetection.js";
 import { FORCED_BREAK_COOLDOWN_MS, SNOOZE_MS, getAlertAction } from "./lib/alerts.js";
+import { calculateBurnoutScore } from "./lib/burnout.js";
 import {
   applyBreakCredit,
   average,
@@ -67,8 +68,6 @@ export default function App() {
   const [snoozedUntil, setSnoozedUntil] = useState(0);
   const [breakContext, setBreakContext] = useState({ noSnooze: false, reason: "manual", beforeBurnRate: 0 });
   const [notificationState, setNotificationState] = useState(null);
-  const [predictionState, setPredictionState] = useState({ status: "ready", message: "" });
-  const apiRefreshRef = useRef(0);
   const activeToastIdRef = useRef(null);
   const breakStartedAtRef = useRef(null);
   const lastBreakAtRef = useRef(0);
@@ -200,58 +199,18 @@ export default function App() {
       )
     };
 
-    const requestId = Date.now();
-    apiRefreshRef.current = requestId;
-    const controller = new AbortController();
-    const requestDelay = setTimeout(() => {
-      const timeout = setTimeout(() => controller.abort(), 4000);
-      fetch("/api/burnout/predict", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(burnoutPayload),
-        signal: controller.signal
-      })
-        .then((response) => response.json())
-        .then((data) => {
-          if (apiRefreshRef.current !== requestId) {
-            return;
-          }
-          if (data?.fallback) {
-            setPredictionState({
-              status: "unavailable",
-              message: "Wellness prediction is temporarily unavailable. We'll keep using your local pacing signals."
-            });
-            return;
-          }
-          const rawScore = Number(data.burn_rate ?? data.burnoutRate ?? data.workloadBalanceScore ?? 0);
-          const adjusted = applyBreakCredit(rawScore, breakCreditRef.current);
-          breakCreditRef.current = 0;
-          setPredictionState({ status: "ready", message: "" });
-          setApiBurnRate(adjusted);
-          setBurnRate(Math.max(adjusted, adaptiveBurnRate));
-          setHistory((current) =>
-            normalizeHistory([
-              ...current.filter((entry) => entry.sessionId !== session.startedAt),
-              { sessionId: session.startedAt, burnRate: Math.max(adjusted, adaptiveBurnRate), timestamp: new Date().toISOString() }
-            ])
-          );
-        })
-        .catch((error) => {
-          if (error?.name === "AbortError" || apiRefreshRef.current !== requestId) {
-            return;
-          }
-          setPredictionState({
-            status: "unavailable",
-            message: "Wellness prediction is temporarily unavailable. We'll keep using your local pacing signals."
-          });
-        })
-        .finally(() => clearTimeout(timeout));
-    }, 350);
+    const { score } = calculateBurnoutScore(burnoutPayload);
+    const adjusted = applyBreakCredit(score, breakCreditRef.current);
+    breakCreditRef.current = 0;
 
-    return () => {
-      clearTimeout(requestDelay);
-      controller.abort();
-    };
+    setApiBurnRate(adjusted);
+    setBurnRate(Math.max(adjusted, adaptiveBurnRate));
+    setHistory((current) =>
+      normalizeHistory([
+        ...current.filter((entry) => entry.sessionId !== session.startedAt),
+        { sessionId: session.startedAt, burnRate: Math.max(adjusted, adaptiveBurnRate), timestamp: new Date().toISOString() }
+      ])
+    );
   }, [
     profile,
     breakOpen,
@@ -432,7 +391,6 @@ export default function App() {
         onStartBreak={() => triggerFullBreakMode({ noSnooze: false, reason: "manual" })}
         banner={banner}
         notificationState={notificationState}
-        predictionState={predictionState}
       />
       {breakOpen ? (
         <BreakMode

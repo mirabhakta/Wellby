@@ -41,7 +41,6 @@ export default function Dashboard({
   profile,
   session,
   burnRate,
-  predictionState,
   statusText,
   breakMinutes,
   history,
@@ -242,11 +241,6 @@ export default function Dashboard({
               <p className="text-sm font-bold uppercase tracking-[0.18em]" style={{ color: colors.muted }}>Break Recommendation</p>
               <h3 className="mt-2 font-display text-2xl">A {breakMinutes}-minute pause could help.</h3>
               <p className="mt-2 text-sm leading-7" style={{ color: colors.muted }}>{statusText}</p>
-              {predictionState?.status === "unavailable" ? (
-                <div className="mt-3 rounded-2xl px-4 py-3 text-sm font-semibold" style={{ background: colors.secondary }}>
-                  {predictionState.message}
-                </div>
-              ) : null}
               {notificationState ? (
                 <div className="mt-3 rounded-2xl px-4 py-3 text-sm font-semibold" style={{ background: colors.secondary }}>
                   {notificationState === "high"

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calculateBurnoutScore } from "./burnoutScoring.js";
+import { calculateBurnoutScore } from "./burnout.js";
 
 test("calculateBurnoutScore returns deterministic bounded score", () => {
   const payload = {
