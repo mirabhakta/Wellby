@@ -1,4 +1,5 @@
-import { useContext } from "react";
+import { useContext, useState } from "react";
+import PropTypes from "prop-types";
 import BurnoutMeter from "./BurnoutMeter.jsx";
 import TrendChart from "./TrendChart.jsx";
 import LeafIcon from "./LeafIcon.jsx";
@@ -41,14 +42,17 @@ export default function Dashboard({
   profile,
   session,
   burnRate,
-  predictionState,
   statusText,
   breakMinutes,
   history,
   fatigueOptIn,
+  fatigueStatus,
+  selfReported,
   onTaskInputChange,
   onTaskStart,
   onTaskComplete,
+  onStartSession,
+  onEndSession,
   onMoodSelect,
   mode,
   onToggleMode,
@@ -56,15 +60,25 @@ export default function Dashboard({
   onSetTheme,
   onToggleFatigue,
   onStartBreak,
+  onClearData,
+  feedbackUrl,
   banner,
   notificationState
 }) {
   const { colors } = useContext(ThemeContext);
+  const [confirmingEnd, setConfirmingEnd] = useState(false);
+  const [confirmingClear, setConfirmingClear] = useState(false);
   const elapsed = formatDuration(session.elapsedSeconds);
   const actionsPerMinute =
     session.elapsedSeconds > 0 ? ((session.actions / session.elapsedSeconds) * 60).toFixed(1) : "0.0";
   const statusPill = getStatusPill(colors, burnRate);
   const { label: statusLabel, ...statusPillStyles } = statusPill;
+
+  function finishEnd(selfReport) {
+    setConfirmingEnd(false);
+    onEndSession(selfReport);
+  }
+
   const moodLabels = {
     1: "Very low / exhausted",
     2: "Low energy",
@@ -75,16 +89,16 @@ export default function Dashboard({
 
   return (
     <div className="min-h-screen px-4 py-6 font-body sm:px-6 lg:px-8" style={{ background: colors.dashBg, color: colors.secondaryText }}>
-      <div className="mx-auto max-w-7xl pb-20">
+      <div className="mx-auto max-w-7xl pb-28">
         <header
           className="mb-6 flex flex-col gap-4 rounded-[32px] p-6 shadow-glow lg:flex-row lg:items-center lg:justify-between"
           style={{ background: colors.sidebarBg, color: colors.wordmark, border: `1px solid ${colors.sidebarBorder}` }}
         >
-          <div className="flex items-center gap-4">
-            <LeafIcon className="h-12 w-12" primary={colors.primary} secondary={colors.secondary} />
-            <div>
+          <div className="flex min-w-0 items-center gap-4">
+            <LeafIcon className="h-12 w-12 shrink-0" primary={colors.primary} secondary={colors.secondary} />
+            <div className="min-w-0">
               <p className="text-sm font-bold uppercase tracking-[0.22em]" style={{ color: colors.navText }}>Wellby</p>
-              <h1 className="font-display text-4xl">Hey {profile.name}, how are you feeling today?</h1>
+              <h1 className="break-words font-display text-3xl sm:text-4xl">Hey {profile.name}, how are you feeling today?</h1>
               <p className="text-base" style={{ color: colors.tagline }}>Work well. Rest well. Be well.</p>
             </div>
           </div>
@@ -130,16 +144,79 @@ export default function Dashboard({
         ) : null}
 
         <section className="mb-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-[32px] p-6 shadow-lg" style={{ background: colors.cardBg, border: `1px solid ${colors.cardBorder}` }}>
-            <div className="mb-5 flex items-center justify-between">
-              <div>
+          <div className="min-w-0 rounded-[32px] p-6 shadow-lg" style={{ background: colors.cardBg, border: `1px solid ${colors.cardBorder}` }}>
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
                 <p className="text-sm font-bold uppercase tracking-[0.18em]" style={{ color: colors.muted }}>Current Session</p>
                 <h2 className="font-display text-3xl">What are you working on?</h2>
               </div>
-              <div className="rounded-full border px-4 py-2 text-sm font-bold" style={statusPillStyles}>
+              <div className="shrink-0 self-start rounded-full border px-4 py-2 text-sm font-bold sm:self-auto" style={statusPillStyles}>
                 {statusLabel}
               </div>
             </div>
+
+            <div
+              className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3"
+              style={{ background: colors.secondary }}
+            >
+              <div className="min-w-0 text-sm font-bold">
+                {session.active ? "Auto-tracking this session" : "Session paused"}
+                <span className="ml-2 text-xs font-semibold" style={{ color: colors.muted }}>
+                  {session.active
+                    ? "Pauses after 10 minutes without activity"
+                    : "Start again, or just begin a task"}
+                </span>
+              </div>
+              {session.active ? (
+                <button
+                  onClick={() => setConfirmingEnd(true)}
+                  className="rounded-full px-4 py-2 text-sm font-bold"
+                  style={{ background: colors.breakBtn, color: colors.breakBtnText }}
+                >
+                  End session
+                </button>
+              ) : (
+                <button
+                  onClick={onStartSession}
+                  className="rounded-full px-4 py-2 text-sm font-bold"
+                  style={{ background: colors.primary, color: colors.primaryText }}
+                >
+                  Start session
+                </button>
+              )}
+            </div>
+
+            {confirmingEnd && session.active ? (
+              <div className="mb-4 rounded-2xl px-4 py-3" style={{ background: colors.secondary }}>
+                <p className="text-sm font-bold">How did that session feel?</p>
+                <p className="mt-1 text-xs" style={{ color: colors.muted }}>
+                  This is the fallback signal when the camera misses fatigue.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {[
+                    { id: "fine", label: "Fine" },
+                    { id: "pushed", label: "Pushed through" },
+                    { id: "exhausted", label: "Running on empty" }
+                  ].map((option) => (
+                    <button
+                      key={option.id}
+                      onClick={() => finishEnd(option.id)}
+                      className="rounded-full px-4 py-2 text-sm font-bold"
+                      style={{ background: colors.cardBg, color: colors.secondaryText }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setConfirmingEnd(false)}
+                    className="rounded-full border px-4 py-2 text-sm font-bold"
+                    style={{ borderColor: colors.cardBorder, color: colors.muted }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : null}
 
             <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
               <input
@@ -235,16 +312,19 @@ export default function Dashboard({
             </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-6">
             <BurnoutMeter score={burnRate} />
 
             <div className="rounded-[28px] p-5 shadow-lg" style={{ background: colors.cardBg, border: `1px solid ${colors.cardBorder}` }}>
               <p className="text-sm font-bold uppercase tracking-[0.18em]" style={{ color: colors.muted }}>Break Recommendation</p>
               <h3 className="mt-2 font-display text-2xl">A {breakMinutes}-minute pause could help.</h3>
               <p className="mt-2 text-sm leading-7" style={{ color: colors.muted }}>{statusText}</p>
-              {predictionState?.status === "unavailable" ? (
-                <div className="mt-3 rounded-2xl px-4 py-3 text-sm font-semibold" style={{ background: colors.secondary }}>
-                  {predictionState.message}
+              {selfReported ? (
+                <div
+                  className="mt-3 rounded-2xl px-4 py-3 text-sm font-semibold"
+                  style={{ background: colors.pillWarnBg, color: colors.pillWarnText }}
+                >
+                  You told us you were running on empty. A break is the kind thing to do.
                 </div>
               ) : null}
               {notificationState ? (
@@ -280,6 +360,16 @@ export default function Dashboard({
                   {fatigueOptIn ? "Enabled" : "Disabled"}
                 </button>
               </div>
+              {fatigueOptIn ? (
+                <p
+                  className="mt-2 text-xs font-semibold"
+                  style={{ color: fatigueStatus?.connected ? colors.burnGood : colors.muted }}
+                >
+                  {fatigueStatus?.connected
+                    ? "Camera on - frames are analysed on this device and never uploaded."
+                    : fatigueStatus?.warning ?? "Starting the local camera..."}
+                </p>
+              ) : null}
 
               <div className="mt-5 rounded-[24px] p-4" style={{ background: colors.secondary }}>
                 <div className="mb-3 text-sm font-bold uppercase tracking-[0.18em]" style={{ color: colors.muted }}>Appearance</div>
@@ -313,6 +403,55 @@ export default function Dashboard({
                   Switch to {mode === "light" ? "dark" : "light"} mode
                 </button>
               </div>
+
+              <div className="mt-5 rounded-[24px] p-4" style={{ background: colors.secondary }}>
+                <div className="mb-2 text-sm font-bold uppercase tracking-[0.18em]" style={{ color: colors.muted }}>
+                  Your data
+                </div>
+                <p className="text-sm leading-6" style={{ color: colors.muted }}>
+                  No account, no upload. Sessions, moods, and settings live in this browser only.
+                </p>
+                {confirmingClear ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => {
+                        setConfirmingClear(false);
+                        onClearData();
+                      }}
+                      className="rounded-full px-4 py-2 text-sm font-bold"
+                      style={{ background: colors.pillDangerBg, color: colors.pillDangerText }}
+                    >
+                      Yes, delete everything
+                    </button>
+                    <button
+                      onClick={() => setConfirmingClear(false)}
+                      className="rounded-full border px-4 py-2 text-sm font-bold"
+                      style={{ borderColor: colors.cardBorder, color: colors.muted }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmingClear(true)}
+                    className="mt-3 rounded-full border px-4 py-2 text-sm font-bold"
+                    style={{ borderColor: colors.cardBorder, color: colors.secondaryText }}
+                  >
+                    Clear my data
+                  </button>
+                )}
+                {feedbackUrl ? (
+                  <a
+                    href={feedbackUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 block text-xs font-bold underline"
+                    style={{ color: colors.primary }}
+                  >
+                    Share feedback
+                  </a>
+                ) : null}
+              </div>
             </div>
           </div>
         </section>
@@ -322,3 +461,62 @@ export default function Dashboard({
     </div>
   );
 }
+
+Dashboard.propTypes = {
+  profile: PropTypes.shape({
+    name: PropTypes.string.isRequired,
+    setup: PropTypes.string,
+    seniority: PropTypes.number,
+    favoriteGame: PropTypes.string,
+    workHours: PropTypes.number
+  }).isRequired,
+  session: PropTypes.shape({
+    active: PropTypes.bool.isRequired,
+    elapsedSeconds: PropTypes.number.isRequired,
+    taskInput: PropTypes.string.isRequired,
+    activeTask: PropTypes.shape({
+      id: PropTypes.number,
+      name: PropTypes.string,
+      startedAt: PropTypes.number
+    }),
+    completedTasks: PropTypes.arrayOf(
+      PropTypes.shape({
+        id: PropTypes.number,
+        name: PropTypes.string,
+        startedAt: PropTypes.number,
+        completedAt: PropTypes.number,
+        durationSeconds: PropTypes.number
+      })
+    ).isRequired,
+    actions: PropTypes.number.isRequired,
+    moodScore: PropTypes.number.isRequired
+  }).isRequired,
+  burnRate: PropTypes.number.isRequired,
+  statusText: PropTypes.string.isRequired,
+  breakMinutes: PropTypes.number.isRequired,
+  history: PropTypes.array.isRequired,
+  fatigueOptIn: PropTypes.bool.isRequired,
+  fatigueStatus: PropTypes.shape({
+    connected: PropTypes.bool,
+    fatigueDetected: PropTypes.bool,
+    status: PropTypes.string,
+    warning: PropTypes.string
+  }).isRequired,
+  selfReported: PropTypes.bool.isRequired,
+  onTaskInputChange: PropTypes.func.isRequired,
+  onTaskStart: PropTypes.func.isRequired,
+  onTaskComplete: PropTypes.func.isRequired,
+  onStartSession: PropTypes.func.isRequired,
+  onEndSession: PropTypes.func.isRequired,
+  onMoodSelect: PropTypes.func.isRequired,
+  mode: PropTypes.string.isRequired,
+  onToggleMode: PropTypes.func.isRequired,
+  activeTheme: PropTypes.string.isRequired,
+  onSetTheme: PropTypes.func.isRequired,
+  onToggleFatigue: PropTypes.func.isRequired,
+  onStartBreak: PropTypes.func.isRequired,
+  onClearData: PropTypes.func.isRequired,
+  feedbackUrl: PropTypes.string.isRequired,
+  banner: PropTypes.string.isRequired,
+  notificationState: PropTypes.string
+};

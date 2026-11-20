@@ -30,29 +30,6 @@ export function getMoodFatigueContribution(moodScore) {
   return Number((((5 - boundedMood) / 4) * 2.8).toFixed(2));
 }
 
-export function getFriendlyStatus(burnRate) {
-  if (burnRate < 0.3) {
-    return { label: "You're doing great! 🌱", tone: "green" };
-  }
-  if (burnRate < 0.6) {
-    return { label: "Let's keep an eye on things 👀", tone: "yellow" };
-  }
-  return { label: "Time for a Wellby break! 💛", tone: "red" };
-}
-
-export function getAlertLevel(burnRate) {
-  if (burnRate > 0.7) {
-    return 3;
-  }
-  if (burnRate > 0.5) {
-    return 2;
-  }
-  if (burnRate >= 0.3) {
-    return 1;
-  }
-  return 0;
-}
-
 export function getBreakMinutes(burnRate, fatigueDetected) {
   if (fatigueDetected || burnRate > 0.7) {
     return 15;

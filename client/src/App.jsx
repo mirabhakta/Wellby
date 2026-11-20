@@ -8,7 +8,18 @@ import { ThemeContext } from "./context/ThemeContext.jsx";
 import { STORAGE_KEYS } from "./lib/constants.js";
 import { useLocalStorage } from "./hooks/useLocalStorage.js";
 import { useBrowserFatigueDetection } from "./hooks/useBrowserFatigueDetection.js";
-import { FORCED_BREAK_COOLDOWN_MS, SNOOZE_MS, getAlertAction } from "./lib/alerts.js";
+import { clearWellbyStorage } from "./lib/storage.js";
+import { durationBucket, getFeedbackUrl, trackEvent } from "./lib/analytics.js";
+import { FORCED_BREAK_COOLDOWN_MS, SNOOZE_MS, getAlertAction, getForcedBreakCount, isHighReading, recordForcedBreak } from "./lib/alerts.js";
+import { calculateBurnoutScore } from "./lib/burnout.js";
+import {
+  SELF_REPORT_WINDOW_MS,
+  createSession,
+  getSessionSeconds,
+  isBaselineEligible,
+  isSessionIdle,
+  summarizeSession
+} from "./lib/sessions.js";
 import {
   applyBreakCredit,
   average,
@@ -18,18 +29,6 @@ import {
   getSetupAvailability,
   normalizeHistory
 } from "./lib/wellbeing.js";
-
-function createSession() {
-  return {
-    startedAt: Date.now(),
-    elapsedSeconds: 0,
-    taskInput: "",
-    activeTask: null,
-    completedTasks: [],
-    actions: 0,
-    moodScore: 3
-  };
-}
 
 function getAdaptiveBurnRate(session, baseline) {
   if (!baseline || !baseline.avgTaskSeconds || !baseline.avgSessionSeconds) {
@@ -56,38 +55,44 @@ export default function App() {
   const [history, setHistory] = useLocalStorage(STORAGE_KEYS.history, []);
   const [sessions, setSessions] = useLocalStorage(STORAGE_KEYS.sessions, []);
   const [fatigueOptIn, setFatigueOptIn] = useLocalStorage(STORAGE_KEYS.fatigueOptIn, false);
-  const [breakLogs, setBreakLogs] = useLocalStorage(STORAGE_KEYS.breakLogs, []);
+  const [, setBreakLogs] = useLocalStorage(STORAGE_KEYS.breakLogs, []);
+  const [forcedBreaks, setForcedBreaks] = useLocalStorage(STORAGE_KEYS.forcedBreaks, { date: "", count: 0 });
   const [session, setSession] = useState(createSession);
   const [apiBurnRate, setApiBurnRate] = useState(0.18);
-  const [burnRate, setBurnRate] = useState(0.18);
+  const [selfReportedAt, setSelfReportedAt] = useState(0);
   const [breakOpen, setBreakOpen] = useState(false);
   const [banner, setBanner] = useState("");
   const [snoozeCount, setSnoozeCount] = useState(0);
   const [alertClock, setAlertClock] = useState(0);
   const [snoozedUntil, setSnoozedUntil] = useState(0);
-  const [breakContext, setBreakContext] = useState({ noSnooze: false, reason: "manual", beforeBurnRate: 0 });
+  const [breakContext, setBreakContext] = useState({ reason: "manual", beforeBurnRate: 0 });
   const [notificationState, setNotificationState] = useState(null);
-  const [predictionState, setPredictionState] = useState({ status: "ready", message: "" });
-  const apiRefreshRef = useRef(0);
   const activeToastIdRef = useRef(null);
   const breakStartedAtRef = useRef(null);
   const lastBreakAtRef = useRef(0);
   const breakCreditRef = useRef(0);
+  const wasHighRef = useRef(false);
+  const endSessionRef = useRef(null);
+  const alertHandlersRef = useRef({});
 
+  const eligibleSessions = useMemo(() => sessions.filter(isBaselineEligible), [sessions]);
   const baseline = useMemo(() => {
-    if (sessions.length < 3) {
+    if (eligibleSessions.length < 3) {
       return null;
     }
-    const seed = sessions.slice(0, 3);
+    const seed = eligibleSessions.slice(0, 3);
     return {
       avgTaskSeconds: average(seed.map((item) => item.avgTaskSeconds || 0)),
       avgSessionSeconds: average(seed.map((item) => item.durationSeconds || 0))
     };
-  }, [sessions]);
-  const fatigueStatus = useBrowserFatigueDetection(fatigueOptIn && Boolean(profile));
+  }, [eligibleSessions]);
+  const fatigueStatus = useBrowserFatigueDetection(fatigueOptIn && Boolean(profile) && !breakOpen);
 
   const adaptiveBurnRate = useMemo(() => getAdaptiveBurnRate(session, baseline), [session, baseline]);
+  const selfReportedActive = selfReportedAt > 0 && Date.now() - selfReportedAt < SELF_REPORT_WINDOW_MS;
   const effectiveBurnRate = Math.max(apiBurnRate, adaptiveBurnRate, fatigueStatus.fatigueDetected ? 0.6 : 0);
+  const elapsedBucket = Math.floor(session.elapsedSeconds / 30);
+  const sessionIsIdle = isSessionIdle(session);
   const breakMinutes = useMemo(
     () => getBreakMinutes(effectiveBurnRate, fatigueStatus.fatigueDetected),
     [effectiveBurnRate, fatigueStatus.fatigueDetected]
@@ -108,22 +113,30 @@ export default function App() {
     setSnoozedUntil(0);
   }
 
-  function triggerFullBreakMode({ noSnooze, reason }) {
+  function triggerFullBreakMode({ reason }) {
     if (breakOpen) {
       return;
     }
     dismissToast();
-    setBanner(noSnooze ? "Wellby is stepping in - your burn rate is high. Let's take a proper break." : "You've snoozed twice - Wellby thinks it's really time now. Let's recharge!");
-    setNotificationState("high");
-    setBreakContext({ noSnooze, reason, beforeBurnRate: effectiveBurnRate });
+    const bannerText =
+      reason === "high"
+        ? "Wellby is stepping in - your burn rate is high. Let's take a proper break."
+        : reason === "mild-escalation"
+          ? "You've snoozed twice - Wellby thinks it's really time now. Let's recharge!"
+          : "";
+    setBanner(bannerText);
+    setNotificationState(reason === "manual" ? null : "high");
+    setBreakContext({ reason, beforeBurnRate: effectiveBurnRate });
     breakStartedAtRef.current = Date.now();
     setBreakOpen(true);
   }
 
   function handleSnooze() {
     const newCount = snoozeCount + 1;
+    const now = Date.now();
     setSnoozeCount(newCount);
-    setSnoozedUntil(Date.now() + SNOOZE_MS);
+    setSnoozedUntil(now + SNOOZE_MS);
+    setSession((current) => (current.active ? { ...current, lastActionAt: now } : current));
     dismissToast();
     setNotificationState(null);
     if (newCount >= 2) {
@@ -132,12 +145,14 @@ export default function App() {
   }
 
   function handleDismiss() {
+    const now = Date.now();
     dismissToast();
     setNotificationState(null);
-    setSnoozedUntil(Date.now() + SNOOZE_MS);
+    setSnoozedUntil(now + SNOOZE_MS);
+    setSession((current) => (current.active ? { ...current, lastActionAt: now } : current));
   }
 
-  function showMildToast() {
+  function showMildToast(urgent = false) {
     if (activeToastIdRef.current) {
       return;
     }
@@ -147,11 +162,12 @@ export default function App() {
       <MildToast
         burnRate={effectiveBurnRate}
         snoozeCount={snoozeCount}
+        urgent={urgent}
         onDismiss={handleDismiss}
         onSnooze={handleSnooze}
         onTakeBreak={() => {
           dismissToast();
-          triggerFullBreakMode({ noSnooze: false, reason: "mild-escalation" });
+          triggerFullBreakMode({ reason: urgent ? "self-report" : "manual" });
         }}
       />,
       { duration: Infinity }
@@ -160,23 +176,37 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (breakOpen) {
+    if (!profile || breakOpen || !session.active) {
       return undefined;
     }
     const timer = setInterval(() => {
-      setSession((current) => ({
-        ...current,
-        elapsedSeconds: Math.floor((Date.now() - current.startedAt) / 1000)
-      }));
+      setSession((current) =>
+        current.active ? { ...current, elapsedSeconds: getSessionSeconds(current) } : current
+      );
     }, 1000);
     return () => clearInterval(timer);
-  }, [breakOpen]);
+  }, [profile, breakOpen, session.active]);
 
   useEffect(() => {
-    if (!profile || breakOpen) {
+    endSessionRef.current = endSession;
+  });
+
+  useEffect(() => {
+    if (!profile || breakOpen || !session.active) {
       return;
     }
 
+    if (sessionIsIdle) {
+      endSessionRef.current({ source: "auto" });
+    }
+  }, [profile, breakOpen, session.active, sessionIsIdle]);
+
+  useEffect(() => {
+    if (!profile || breakOpen || !session.active) {
+      return;
+    }
+
+    const elapsedSeconds = elapsedBucket * 30;
     const averageTaskSeconds =
       average(session.completedTasks.map((task) => task.durationSeconds)) || baseline?.avgTaskSeconds || 2400;
     const moodFatigue = getMoodFatigueContribution(session.moodScore);
@@ -187,12 +217,12 @@ export default function App() {
           Math.max(
             0,
             moodFatigue +
-              Math.min(4, session.elapsedSeconds / 3600) +
+              Math.min(4, elapsedSeconds / 3600) +
               Math.max(0, (averageTaskSeconds - (baseline?.avgTaskSeconds || averageTaskSeconds)) / 600)
           )
         ).toFixed(2)
       ),
-      hours_worked: Number((session.elapsedSeconds / 3600).toFixed(2)),
+      hours_worked: Number((elapsedSeconds / 3600).toFixed(2)),
       wfh_setup_available: getSetupAvailability(profile.setup),
       designation: profile.seniority,
       resource_allocation: Number(
@@ -200,62 +230,22 @@ export default function App() {
       )
     };
 
-    const requestId = Date.now();
-    apiRefreshRef.current = requestId;
-    const controller = new AbortController();
-    const requestDelay = setTimeout(() => {
-      const timeout = setTimeout(() => controller.abort(), 4000);
-      fetch("/api/burnout/predict", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(burnoutPayload),
-        signal: controller.signal
-      })
-        .then((response) => response.json())
-        .then((data) => {
-          if (apiRefreshRef.current !== requestId) {
-            return;
-          }
-          if (data?.fallback) {
-            setPredictionState({
-              status: "unavailable",
-              message: "Wellness prediction is temporarily unavailable. We'll keep using your local pacing signals."
-            });
-            return;
-          }
-          const rawScore = Number(data.burn_rate ?? data.burnoutRate ?? data.workloadBalanceScore ?? 0);
-          const adjusted = applyBreakCredit(rawScore, breakCreditRef.current);
-          breakCreditRef.current = 0;
-          setPredictionState({ status: "ready", message: "" });
-          setApiBurnRate(adjusted);
-          setBurnRate(Math.max(adjusted, adaptiveBurnRate));
-          setHistory((current) =>
-            normalizeHistory([
-              ...current.filter((entry) => entry.sessionId !== session.startedAt),
-              { sessionId: session.startedAt, burnRate: Math.max(adjusted, adaptiveBurnRate), timestamp: new Date().toISOString() }
-            ])
-          );
-        })
-        .catch((error) => {
-          if (error?.name === "AbortError" || apiRefreshRef.current !== requestId) {
-            return;
-          }
-          setPredictionState({
-            status: "unavailable",
-            message: "Wellness prediction is temporarily unavailable. We'll keep using your local pacing signals."
-          });
-        })
-        .finally(() => clearTimeout(timeout));
-    }, 350);
+    const { score } = calculateBurnoutScore(burnoutPayload);
+    const adjusted = applyBreakCredit(score, breakCreditRef.current);
+    breakCreditRef.current = 0;
 
-    return () => {
-      clearTimeout(requestDelay);
-      controller.abort();
-    };
+    setApiBurnRate(adjusted);
+    setHistory((current) =>
+      normalizeHistory([
+        ...current.filter((entry) => entry.sessionId !== session.startedAt),
+        { sessionId: session.startedAt, burnRate: Math.max(adjusted, adaptiveBurnRate), timestamp: new Date().toISOString() }
+      ])
+    );
   }, [
     profile,
     breakOpen,
-    Math.floor(session.elapsedSeconds / 30),
+    session.active,
+    elapsedBucket,
     session.completedTasks,
     session.actions,
     session.moodScore,
@@ -266,45 +256,73 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    setBurnRate(Math.max(apiBurnRate, adaptiveBurnRate, fatigueStatus.fatigueDetected ? 0.6 : 0));
-  }, [apiBurnRate, adaptiveBurnRate, fatigueStatus.fatigueDetected]);
+    alertHandlersRef.current = {
+      clearAllNotifications,
+      showMildToast,
+      triggerFullBreakMode
+    };
+  });
 
   useEffect(() => {
     if (!profile || breakOpen) {
       return;
     }
 
+    if (!session.active && !selfReportedActive) {
+      return;
+    }
+
+    const highNow = isHighReading({
+      burnRate: effectiveBurnRate,
+      fatigueDetected: fatigueStatus.fatigueDetected
+    });
     const action = getAlertAction({
       burnRate: effectiveBurnRate,
       fatigueDetected: fatigueStatus.fatigueDetected,
+      selfReported: selfReportedActive,
       notificationState,
       snoozeCount,
       snoozedUntil,
       lastBreakAt: lastBreakAtRef.current,
+      previousHigh: wasHighRef.current,
+      forcedToday: getForcedBreakCount(forcedBreaks),
       now: Date.now()
     });
+    wasHighRef.current = highNow;
+
+    const handlers = alertHandlersRef.current;
 
     if (action.type === "clear") {
-      clearAllNotifications();
+      handlers.clearAllNotifications();
+      return;
+    }
+
+    if (action.type === "capped") {
+      setBanner("You've taken three Wellby breaks today. The meter stays on, but no more interruptions.");
       return;
     }
 
     if (action.type === "force-break") {
-      triggerFullBreakMode({ noSnooze: action.noSnooze, reason: action.reason });
+      setForcedBreaks((current) => recordForcedBreak(current));
+      handlers.triggerFullBreakMode({ reason: action.reason });
       return;
     }
 
     if (action.type === "mild") {
-      showMildToast();
+      handlers.showMildToast(Boolean(action.urgent));
     }
   }, [
     effectiveBurnRate,
     fatigueStatus.fatigueDetected,
+    selfReportedActive,
     profile,
     breakOpen,
+    session.active,
     notificationState,
     snoozeCount,
     snoozedUntil,
+    forcedBreaks,
+    setForcedBreaks,
     alertClock
   ]);
 
@@ -332,51 +350,131 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [snoozedUntil]);
 
-  function completeCurrentSession() {
-    const breakDurationSeconds = breakStartedAtRef.current ? Math.max(0, Math.floor((Date.now() - breakStartedAtRef.current) / 1000)) : 0;
+  useEffect(() => {
+    if (!selfReportedAt) {
+      return undefined;
+    }
+
+    const remaining = SELF_REPORT_WINDOW_MS - (Date.now() - selfReportedAt);
+    if (remaining <= 0) {
+      setSelfReportedAt(0);
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      setSelfReportedAt(0);
+      setAlertClock((current) => current + 1);
+    }, remaining);
+    return () => clearTimeout(timer);
+  }, [selfReportedAt]);
+
+  function startSession(source = "manual") {
+    setSession(createSession());
+    setSelfReportedAt(0);
+    wasHighRef.current = false;
+    clearAllNotifications();
+    trackEvent("session_started", { source });
+  }
+
+  function handleClearData() {
+    trackEvent("data_cleared", {});
+    clearWellbyStorage();
+    window.location.reload();
+  }
+
+  function endSession({ source = "manual", selfReport = null } = {}) {
+    if (!session.active) {
+      return;
+    }
+
+    const endedAt = source === "auto" ? session.lastActionAt : Date.now();
+    const summary = summarizeSession(session, { endedAt, source, selfReport });
+
+    if (isBaselineEligible(summary)) {
+      setSessions((current) => [...current, summary]);
+    }
+
+    setSession((current) => ({
+      ...current,
+      active: false,
+      elapsedSeconds: getSessionSeconds(current, endedAt),
+      lastActionAt: endedAt
+    }));
+    clearAllNotifications();
+
+    if (selfReport === "exhausted") {
+      setSelfReportedAt(Date.now());
+    }
+
+    trackEvent("session_ended", {
+      source,
+      duration: durationBucket(summary.durationSeconds),
+      selfReport: selfReport ?? "none",
+      baselineEligible: isBaselineEligible(summary)
+    });
+  }
+
+  function completeBreak() {
+    const breakDurationSeconds = breakStartedAtRef.current
+      ? Math.max(0, Math.floor((Date.now() - breakStartedAtRef.current) / 1000))
+      : 0;
     breakStartedAtRef.current = null;
-    const taskDurations = session.completedTasks.map((task) => task.durationSeconds);
-    const summary = {
-      id: session.startedAt,
-      durationSeconds: session.elapsedSeconds,
-      avgTaskSeconds: taskDurations.length ? average(taskDurations) : session.elapsedSeconds || 0,
-      completedTasks: session.completedTasks.length,
-      breakTakenAt: new Date().toISOString()
-    };
-    setSessions((current) => [...current, summary]);
-    setBreakLogs((current) => [...current, { timestamp: summary.breakTakenAt, durationMinutes: breakMinutes }]);
+
+    setBreakLogs((current) => [
+      ...current,
+      {
+        timestamp: new Date().toISOString(),
+        durationMinutes: Math.max(1, Math.round(breakDurationSeconds / 60))
+      }
+    ]);
+    trackEvent("break_completed", {
+      minutes: Math.max(1, Math.round(breakDurationSeconds / 60)),
+      reason: breakContext.reason
+    });
     lastBreakAtRef.current = Date.now();
     breakCreditRef.current = 0.1;
     setApiBurnRate((current) => Math.max(0, Number((current - 0.1).toFixed(2))));
-    setBurnRate((current) => Math.max(0, Number((current - 0.1).toFixed(2))));
     setSnoozeCount(0);
     clearAllNotifications();
-    setSession((current) => ({
-      ...current,
-      startedAt: current.startedAt + breakDurationSeconds * 1000,
-      activeTask: current.activeTask
+    setSession((current) =>
+      current.active
         ? {
-            ...current.activeTask,
-            startedAt: current.activeTask.startedAt + breakDurationSeconds * 1000
+            ...current,
+            startedAt: current.startedAt + breakDurationSeconds * 1000,
+            lastActionAt: Date.now(),
+            activeTask: current.activeTask
+              ? {
+                  ...current.activeTask,
+                  startedAt: current.activeTask.startedAt + breakDurationSeconds * 1000
+                }
+              : null
           }
-        : null
-    }));
+        : current
+    );
   }
 
   function handleTaskStart() {
-    if (!session.taskInput.trim()) {
+    const taskName = session.taskInput.trim();
+    if (!taskName) {
       return;
     }
-    setSession((current) => ({
-      ...current,
-      actions: current.actions + 1,
-      activeTask: {
-        id: Date.now(),
-        name: current.taskInput.trim(),
-        startedAt: Date.now()
-      },
-      taskInput: ""
-    }));
+
+    const now = Date.now();
+    const resuming = !session.active;
+    setSession((current) => {
+      const base = current.active ? current : createSession(now);
+      return {
+        ...base,
+        actions: base.actions + 1,
+        activeTask: { id: now, name: taskName, startedAt: now },
+        taskInput: "",
+        lastActionAt: now
+      };
+    });
+
+    if (resuming) {
+      trackEvent("session_started", { source: "activity" });
+    }
   }
 
   function handleTaskComplete() {
@@ -384,16 +482,20 @@ export default function App() {
       if (!current.activeTask) {
         return current;
       }
+
+      const now = Date.now();
       return {
         ...current,
+        active: true,
+        lastActionAt: now,
         actions: current.actions + 1,
         activeTask: null,
         completedTasks: [
           ...current.completedTasks,
           {
             ...current.activeTask,
-            completedAt: Date.now(),
-            durationSeconds: Math.max(30, Math.floor((Date.now() - current.activeTask.startedAt) / 1000))
+            completedAt: now,
+            durationSeconds: Math.max(30, Math.floor((now - current.activeTask.startedAt) / 1000))
           }
         ]
       };
@@ -401,8 +503,29 @@ export default function App() {
   }
 
   if (!profile) {
-    return <OnboardingFlow onComplete={setProfile} />;
+    return (
+      <OnboardingFlow
+        onComplete={(nextProfile) => {
+          setProfile(nextProfile);
+          startSession("onboarding");
+          trackEvent("onboarding_completed", {
+            setup: nextProfile.setup,
+            seniority: nextProfile.seniority
+          });
+        }}
+      />
+    );
   }
+
+  const feedbackUrl = getFeedbackUrl();
+
+  const statusText = selfReportedActive
+    ? "You told us you're running on empty. Treat the next block of work gently, or take the break."
+    : effectiveBurnRate < 0.3
+      ? "Your pace looks sustainable right now."
+      : effectiveBurnRate < 0.6
+        ? "Things are starting to stack up. A shorter pause could help."
+        : "Your system is asking for a real pause before work gets heavier.";
 
   return (
     <>
@@ -411,47 +534,65 @@ export default function App() {
         session={session}
         burnRate={effectiveBurnRate}
         history={history}
-        statusText={
-          effectiveBurnRate < 0.3
-            ? "Your pace looks sustainable right now."
-            : effectiveBurnRate < 0.6
-              ? "Things are starting to stack up. A shorter pause could help."
-              : "Your system is asking for a real pause before work gets heavier."
-        }
+        statusText={statusText}
         breakMinutes={breakMinutes}
         fatigueOptIn={fatigueOptIn}
+        fatigueStatus={fatigueStatus}
+        selfReported={selfReportedActive}
         onTaskInputChange={(value) => setSession((current) => ({ ...current, taskInput: value }))}
         onTaskStart={handleTaskStart}
         onTaskComplete={handleTaskComplete}
-        onMoodSelect={(score) => setSession((current) => ({ ...current, moodScore: clampMoodScore(score) }))}
+        onStartSession={() => startSession("manual")}
+        onEndSession={(selfReport) => endSession({ source: "manual", selfReport })}
+        onMoodSelect={(score) => {
+          const now = Date.now();
+          const resuming = !session.active;
+          setSession((current) => {
+            const base = current.active ? current : createSession(now);
+            return { ...base, moodScore: clampMoodScore(score), lastActionAt: now };
+          });
+          if (resuming) {
+            trackEvent("session_started", { source: "activity" });
+          }
+        }}
         mode={mode}
         onToggleMode={toggleMode}
         activeTheme={theme}
         onSetTheme={setTheme}
-        onToggleFatigue={() => setFatigueOptIn((current) => !current)}
-        onStartBreak={() => triggerFullBreakMode({ noSnooze: false, reason: "manual" })}
+        onToggleFatigue={() => {
+          if (!fatigueOptIn) {
+            trackEvent("fatigue_optin", {});
+          }
+          setFatigueOptIn((current) => !current);
+        }}
+        onStartBreak={() => triggerFullBreakMode({ reason: "manual" })}
+        onClearData={handleClearData}
+        feedbackUrl={feedbackUrl}
         banner={banner}
         notificationState={notificationState}
-        predictionState={predictionState}
       />
       {breakOpen ? (
         <BreakMode
           initialGame={profile.favoriteGame}
-          noSnooze={breakContext.noSnooze}
           reason={breakContext.reason}
           beforeBurnRate={breakContext.beforeBurnRate}
           afterBurnRate={Math.max(0, Number((effectiveBurnRate - 0.1).toFixed(2)))}
           onClose={() => {
             setBreakOpen(false);
-            completeCurrentSession();
+            completeBreak();
           }}
         />
       ) : null}
       <footer
-        className="fixed bottom-0 left-0 right-0 px-4 py-3 text-center text-xs font-semibold"
+        className="fixed bottom-0 left-0 right-0 px-4 py-3 text-xs font-semibold"
         style={{ background: colors.sidebarBg, color: colors.wordmark }}
       >
-        Wellby is a wellness companion, not a substitute for professional mental health care.
+        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
+          <span>Wellby is a wellness companion, not a substitute for professional mental health care.</span>
+          <a href={feedbackUrl} target="_blank" rel="noreferrer" className="underline">
+            Share feedback
+          </a>
+        </div>
       </footer>
     </>
   );

@@ -1,4 +1,5 @@
 import { useContext, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import { ThemeContext } from "../../context/ThemeContext.jsx";
 
 const lines = [
@@ -132,3 +133,7 @@ export default function TicTacToeGame({ onExit }) {
     </div>
   );
 }
+
+TicTacToeGame.propTypes = {
+  onExit: PropTypes.func.isRequired
+};

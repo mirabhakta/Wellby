@@ -1,4 +1,5 @@
 import { useContext, useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import { motion } from "framer-motion";
 import { ThemeContext } from "../context/ThemeContext.jsx";
 import { GAME_OPTIONS } from "../lib/constants.js";
@@ -15,7 +16,7 @@ const GAME_COMPONENTS = {
   uno: UnoGame
 };
 
-export default function BreakMode({ initialGame, onClose, noSnooze, reason, beforeBurnRate, afterBurnRate }) {
+export default function BreakMode({ initialGame, onClose, reason, beforeBurnRate, afterBurnRate }) {
   const { colors } = useContext(ThemeContext);
   const [phase, setPhase] = useState("mindful");
   const [secondsLeft, setSecondsLeft] = useState(60);
@@ -50,12 +51,14 @@ export default function BreakMode({ initialGame, onClose, noSnooze, reason, befo
   const breakMessage =
     reason === "manual"
       ? "You chose to pause before things piled up. Let's use the time well."
-      : noSnooze
+      : reason === "high"
         ? "Wellby is stepping in - your burn rate is high. Let's take a proper break."
-        : "You've snoozed twice - Wellby thinks it's really time now. Let's recharge!";
+        : reason === "self-report"
+          ? "You told us you were running on empty. Let's make this pause count."
+          : "You've snoozed twice - Wellby thinks it's really time now. Let's recharge!";
 
   return (
-    <div className="fixed inset-0 z-50 overflow-auto px-4 py-8 backdrop-blur-md" style={{ background: colors.dashBg, color: colors.secondaryText }}>
+    <div className="fixed inset-0 z-50 overflow-auto px-4 py-8 pb-24 backdrop-blur-md" style={{ background: colors.dashBg, color: colors.secondaryText }}>
       <div className="mx-auto max-w-6xl">
         {phase === "mindful" ? (
           <div className="grid min-h-[80vh] place-items-center">
@@ -64,7 +67,7 @@ export default function BreakMode({ initialGame, onClose, noSnooze, reason, befo
                 <LeafIcon className="h-8 w-8" primary={colors.primary} secondary={colors.secondary} />
                 <p className="text-sm font-bold uppercase tracking-[0.22em]" style={{ color: colors.muted }}>Mindful Moment</p>
               </div>
-              <h2 className="mt-3 font-display text-5xl">Let's take a breath together</h2>
+              <h2 className="mt-3 font-display text-4xl sm:text-5xl">Let's take a breath together</h2>
               <p className="mt-4 text-lg" style={{ color: colors.muted }}>{breakMessage}</p>
               <motion.div
                 animate={{ scale: breathStage.scale }}
@@ -117,7 +120,7 @@ export default function BreakMode({ initialGame, onClose, noSnooze, reason, befo
                   Finish break
                 </button>
               </div>
-              <div className="mt-6 grid gap-3 md:grid-cols-4">
+              <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
                 {GAME_OPTIONS.map((game) => (
                   <button
                     key={game.id}
@@ -145,9 +148,9 @@ export default function BreakMode({ initialGame, onClose, noSnooze, reason, befo
                   <span key={`${color}-${index}`} className="h-3 w-3 rounded-full" style={{ background: color }} />
                 ))}
               </div>
-              <h2 className="mt-4 font-display text-5xl">Recharged!</h2>
+              <h2 className="mt-4 font-display text-4xl sm:text-5xl">Recharged!</h2>
               <p className="mt-3 text-lg" style={{ color: colors.muted }}>
-                Your break is logged and Wellby is applying a lighter burn-rate estimate while the next refresh loads.
+                Your break is logged. Wellby is applying a lighter burn-rate estimate as you return to work.
               </p>
               <div className="mt-8 grid gap-4 md:grid-cols-2">
                 <div className="rounded-[24px] p-5" style={{ background: colors.secondary }}>
@@ -179,3 +182,11 @@ export default function BreakMode({ initialGame, onClose, noSnooze, reason, befo
     </div>
   );
 }
+
+BreakMode.propTypes = {
+  initialGame: PropTypes.string,
+  onClose: PropTypes.func.isRequired,
+  reason: PropTypes.string.isRequired,
+  beforeBurnRate: PropTypes.number.isRequired,
+  afterBurnRate: PropTypes.number.isRequired
+};

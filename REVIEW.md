@@ -225,6 +225,23 @@ This review doubles as the work list for the first PR
 - [x] 5. Snooze window and escalation tier actually fire
 - [x] 6. UNO wild cards resolve to a real color
 
-Deferred to follow-up PRs: baseline poisoning, real 404s, dynamic `vite`
-import, dependency upgrades, privacy reset, CI/lint/types, dead-code removal
-(`flask_api.py`, unused packages and helpers).
+Deferred to Phase 3: TypeScript migration, trend-chart daily aggregation,
+`workHours` personalization, accessibility pass, bundle splitting, and the
+actual Cloudflare Pages deployment.
+
+## Phase 2 (launch hardening)
+
+Addressed after the first PR:
+
+- Baseline poisoning — sessions pause after 10 idle minutes, only count with
+  5 minutes and real activity, and stop at the last action.
+- Real 404s and JSON errors; no eager `vite` import in production.
+- Production dependency audit is clean; Flask scaffold, `.codex`, and
+  `chessboardjs` removed.
+- Clear-my-data, camera indicator, and the camera stops during breaks.
+- CI (lint, node tests, DOM tests, build, prod audit), ESLint, and PropTypes.
+- Mobile overflow at a true 390 px viewport.
+- README rewritten to match the shipped product.
+
+Still open for Phase 3: TypeScript, trend aggregation, `workHours`,
+accessibility, bundle splitting, and the live Cloudflare Pages deploy.

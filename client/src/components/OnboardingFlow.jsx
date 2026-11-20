@@ -1,4 +1,5 @@
 import { useContext, useState } from "react";
+import PropTypes from "prop-types";
 import { motion } from "framer-motion";
 import { ThemeContext } from "../context/ThemeContext.jsx";
 import LeafIcon from "./LeafIcon.jsx";
@@ -35,16 +36,16 @@ export default function OnboardingFlow({ onComplete }) {
           className="rounded-[36px] p-8 shadow-glow backdrop-blur"
           style={{ background: colors.cardBg, border: `1px solid ${colors.cardBorder}` }}
         >
-          <div className="mb-8 flex items-center gap-4">
+          <div className="mb-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
             <LeafIcon className="h-14 w-14" primary={colors.primary} secondary={colors.secondary} />
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.22em]" style={{ color: colors.muted }}>Wellby</p>
-              <h1 className="font-display text-5xl leading-tight">Work well. Rest well. Be well.</h1>
+              <h1 className="font-display text-4xl leading-tight sm:text-5xl">Work well. Rest well. Be well.</h1>
             </div>
           </div>
           <p className="max-w-xl text-lg leading-8" style={{ color: colors.muted }}>
-            A friendly AI wellbeing companion for tech workers. Wellby learns your flow, watches for
-            burnout risk, and makes breaks feel restorative instead of guilty.
+            A friendly, local-first wellbeing companion for tech workers. Wellby learns your flow,
+            watches for burnout risk, and makes breaks feel restorative instead of guilty.
           </p>
           <div className="mt-10 grid gap-4 md:grid-cols-2">
             {[
@@ -164,3 +165,7 @@ export default function OnboardingFlow({ onComplete }) {
     </div>
   );
 }
+
+OnboardingFlow.propTypes = {
+  onComplete: PropTypes.func.isRequired
+};

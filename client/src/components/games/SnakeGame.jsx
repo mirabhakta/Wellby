@@ -1,4 +1,5 @@
 import { useContext, useEffect, useRef, useState } from "react";
+import PropTypes from "prop-types";
 import { ThemeContext } from "../../context/ThemeContext.jsx";
 import { STORAGE_KEYS } from "../../lib/constants.js";
 import { readStorage, writeStorage } from "../../lib/storage.js";
@@ -136,7 +137,7 @@ export default function SnakeGame({ onExit }) {
           End Break & Return to Work
         </button>
       </div>
-      <canvas ref={canvasRef} width={320} height={320} className="mx-auto rounded-[24px] shadow-inner" />
+      <canvas ref={canvasRef} width={320} height={320} className="mx-auto h-auto w-full max-w-[320px] rounded-[24px] shadow-inner" />
       <div className="mt-4 flex items-center justify-between">
         <p className="font-bold">Score: {score}</p>
         {gameOver ? (
@@ -153,3 +154,7 @@ export default function SnakeGame({ onExit }) {
     </div>
   );
 }
+
+SnakeGame.propTypes = {
+  onExit: PropTypes.func.isRequired
+};

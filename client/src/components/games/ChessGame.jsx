@@ -1,4 +1,5 @@
 import { useContext, useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import { Chess } from "chess.js";
 import { ThemeContext } from "../../context/ThemeContext.jsx";
 import { tryMove } from "../../lib/chess.js";
@@ -229,3 +230,7 @@ export default function ChessGame({ onExit }) {
     </div>
   );
 }
+
+ChessGame.propTypes = {
+  onExit: PropTypes.func.isRequired
+};

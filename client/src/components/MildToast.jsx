@@ -1,8 +1,9 @@
 import { useContext, useEffect } from "react";
+import PropTypes from "prop-types";
 import { ThemeContext } from "../context/ThemeContext.jsx";
 import LeafIcon from "./LeafIcon.jsx";
 
-export default function MildToast({ burnRate, onDismiss, onSnooze, onTakeBreak, snoozeCount }) {
+export default function MildToast({ burnRate, onDismiss, onSnooze, onTakeBreak, snoozeCount, urgent = false }) {
   const { colors } = useContext(ThemeContext);
 
   useEffect(() => {
@@ -28,9 +29,13 @@ export default function MildToast({ burnRate, onDismiss, onSnooze, onTakeBreak, 
         <div className="flex-1">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-extrabold">Heads up - you've been at it a while</h3>
+              <h3 className="text-sm font-extrabold">
+                {urgent ? "You mentioned you're running on empty" : "Heads up - you've been at it a while"}
+              </h3>
               <p className="mt-1 text-sm" style={{ color: colors.muted }}>
-                Your burn rate is climbing. A short break might help, but no pressure just yet!
+                {urgent
+                  ? "That's worth taking seriously. A short break now, or five more minutes if you need to land something."
+                  : "Your burn rate is climbing. A short break might help, but no pressure just yet!"}
               </p>
             </div>
             <div
@@ -50,7 +55,7 @@ export default function MildToast({ burnRate, onDismiss, onSnooze, onTakeBreak, 
               className="rounded-full px-4 py-2 text-sm font-bold"
               style={{ background: colors.breakBtn, color: colors.breakBtnText }}
             >
-              Take a break
+              {urgent ? "Take that break" : "Take a break"}
             </button>
             {snoozeCount < 2 ? (
               <button
@@ -74,3 +79,12 @@ export default function MildToast({ burnRate, onDismiss, onSnooze, onTakeBreak, 
     </div>
   );
 }
+
+MildToast.propTypes = {
+  burnRate: PropTypes.number.isRequired,
+  onDismiss: PropTypes.func.isRequired,
+  onSnooze: PropTypes.func.isRequired,
+  onTakeBreak: PropTypes.func.isRequired,
+  snoozeCount: PropTypes.number.isRequired,
+  urgent: PropTypes.bool
+};

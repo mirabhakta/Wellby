@@ -1,4 +1,5 @@
 import { useContext, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import { ThemeContext } from "../../context/ThemeContext.jsx";
 import { CARD_COLORS, resolvePlayedColor } from "../../lib/uno.js";
 
@@ -240,3 +241,7 @@ export default function UnoGame({ onExit }) {
     </div>
   );
 }
+
+UnoGame.propTypes = {
+  onExit: PropTypes.func.isRequired
+};
