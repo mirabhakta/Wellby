@@ -10,6 +10,7 @@ import { useLocalStorage } from "./hooks/useLocalStorage.js";
 import { useBrowserFatigueDetection } from "./hooks/useBrowserFatigueDetection.js";
 import { FORCED_BREAK_COOLDOWN_MS, isBreakCoolingDown } from "./lib/alerts.js";
 import {
+  applyBreakCredit,
   average,
   clampMoodScore,
   getBreakMinutes,
@@ -64,7 +65,6 @@ export default function App() {
   const [snoozeCount, setSnoozeCount] = useState(0);
   const [escalateOnNext, setEscalateOnNext] = useState(false);
   const [alertClock, setAlertClock] = useState(0);
-  const [breakCredit, setBreakCredit] = useState(0);
   const [breakContext, setBreakContext] = useState({ noSnooze: false, reason: "manual", beforeBurnRate: 0 });
   const [notificationState, setNotificationState] = useState(null);
   const [lastApiUpdatedAt, setLastApiUpdatedAt] = useState(0);
@@ -74,6 +74,7 @@ export default function App() {
   const escalateOnNextRef = useRef(false);
   const breakStartedAtRef = useRef(null);
   const lastBreakAtRef = useRef(0);
+  const breakCreditRef = useRef(0);
 
   const baseline = useMemo(() => {
     if (sessions.length < 3) {
@@ -220,13 +221,11 @@ export default function App() {
             return;
           }
           const rawScore = Number(data.burn_rate ?? data.burnoutRate ?? data.workloadBalanceScore ?? 0);
-          const adjusted = Math.max(0, Number((rawScore - breakCredit).toFixed(2)));
+          const adjusted = applyBreakCredit(rawScore, breakCreditRef.current);
+          breakCreditRef.current = 0;
           setPredictionState({ status: "ready", message: "" });
           setApiBurnRate(adjusted);
           setBurnRate(Math.max(adjusted, adaptiveBurnRate));
-          if (breakCredit > 0) {
-            setBreakCredit(0);
-          }
           setLastApiUpdatedAt(Date.now());
           setHistory((current) =>
             normalizeHistory([
@@ -259,7 +258,6 @@ export default function App() {
     session.actions,
     session.moodScore,
     baseline,
-    breakCredit,
     setHistory,
     session.startedAt,
     adaptiveBurnRate
@@ -321,7 +319,7 @@ export default function App() {
     setSessions((current) => [...current, summary]);
     setBreakLogs((current) => [...current, { timestamp: summary.breakTakenAt, durationMinutes: breakMinutes }]);
     lastBreakAtRef.current = Date.now();
-    setBreakCredit(0.1);
+    breakCreditRef.current = 0.1;
     setApiBurnRate((current) => Math.max(0, Number((current - 0.1).toFixed(2))));
     setBurnRate((current) => Math.max(0, Number((current - 0.1).toFixed(2))));
     setSnoozeCount(0);

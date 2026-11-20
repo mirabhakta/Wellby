@@ -67,3 +67,16 @@ export function normalizeHistory(history) {
   const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   return history.filter((item) => new Date(item.timestamp).getTime() >= oneWeekAgo);
 }
+
+/**
+ * Applies the post-break discount to a score without letting it go negative
+ * and without float artifacts (0.3 - 0.1 is 0.19999999999999998).
+ */
+export function applyBreakCredit(score, credit = 0) {
+  const parsedScore = Number(score);
+  const parsedCredit = Number(credit);
+  const safeScore = Number.isFinite(parsedScore) ? parsedScore : 0;
+  const safeCredit = Number.isFinite(parsedCredit) ? parsedCredit : 0;
+
+  return Math.max(0, Number((safeScore - safeCredit).toFixed(2)));
+}
