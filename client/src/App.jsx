@@ -8,6 +8,7 @@ import { ThemeContext } from "./context/ThemeContext.jsx";
 import { STORAGE_KEYS } from "./lib/constants.js";
 import { useLocalStorage } from "./hooks/useLocalStorage.js";
 import { useBrowserFatigueDetection } from "./hooks/useBrowserFatigueDetection.js";
+import { FORCED_BREAK_COOLDOWN_MS, isBreakCoolingDown } from "./lib/alerts.js";
 import {
   average,
   clampMoodScore,
@@ -62,6 +63,7 @@ export default function App() {
   const [banner, setBanner] = useState("");
   const [snoozeCount, setSnoozeCount] = useState(0);
   const [escalateOnNext, setEscalateOnNext] = useState(false);
+  const [alertClock, setAlertClock] = useState(0);
   const [breakCredit, setBreakCredit] = useState(0);
   const [breakContext, setBreakContext] = useState({ noSnooze: false, reason: "manual", beforeBurnRate: 0 });
   const [notificationState, setNotificationState] = useState(null);
@@ -71,6 +73,7 @@ export default function App() {
   const activeToastIdRef = useRef(null);
   const escalateOnNextRef = useRef(false);
   const breakStartedAtRef = useRef(null);
+  const lastBreakAtRef = useRef(0);
 
   const baseline = useMemo(() => {
     if (sessions.length < 3) {
@@ -277,6 +280,9 @@ export default function App() {
     }
 
     if (effectiveBurnRate >= 0.6 || fatigueStatus.fatigueDetected) {
+      if (isBreakCoolingDown({ now: Date.now(), lastBreakAt: lastBreakAtRef.current })) {
+        return;
+      }
       triggerFullBreakMode({ noSnooze: true, reason: "high" });
       return;
     }
@@ -289,7 +295,17 @@ export default function App() {
     if (notificationState !== "mild") {
       showMildToast();
     }
-  }, [effectiveBurnRate, fatigueStatus.fatigueDetected, profile, breakOpen, notificationState, lastApiUpdatedAt]);
+  }, [effectiveBurnRate, fatigueStatus.fatigueDetected, profile, breakOpen, notificationState, lastApiUpdatedAt, alertClock]);
+
+  useEffect(() => {
+    const remaining = FORCED_BREAK_COOLDOWN_MS - (Date.now() - lastBreakAtRef.current);
+    if (!lastBreakAtRef.current || remaining <= 0) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => setAlertClock((current) => current + 1), remaining);
+    return () => clearTimeout(timer);
+  }, [sessions.length]);
 
   function completeCurrentSession() {
     const breakDurationSeconds = breakStartedAtRef.current ? Math.max(0, Math.floor((Date.now() - breakStartedAtRef.current) / 1000)) : 0;
@@ -304,6 +320,7 @@ export default function App() {
     };
     setSessions((current) => [...current, summary]);
     setBreakLogs((current) => [...current, { timestamp: summary.breakTakenAt, durationMinutes: breakMinutes }]);
+    lastBreakAtRef.current = Date.now();
     setBreakCredit(0.1);
     setApiBurnRate((current) => Math.max(0, Number((current - 0.1).toFixed(2))));
     setBurnRate((current) => Math.max(0, Number((current - 0.1).toFixed(2))));
