@@ -2,34 +2,31 @@ import express from "express";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createServer as createViteServer } from "vite";
-import burnoutRoutes from "./routes/burnout.js";
-import fatigueRoutes from "./routes/fatigue.js";
-import healthRoutes from "./routes/health.js";
+import { createApiApp } from "./app.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 
-async function createApp() {
-  const app = express();
+export async function createApp() {
+  const app = createApiApp();
   const isProd = process.env.NODE_ENV === "production";
 
-  app.use(express.json());
-  app.use("/api/health", healthRoutes);
-  app.use("/api/burnout", burnoutRoutes);
-  app.use("/api/fatigue", fatigueRoutes);
-
   if (!isProd) {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       root: path.join(rootDir, "client"),
       server: { middlewareMode: true },
-      appType: "spa"
+      appType: "custom"
     });
 
     app.use(vite.middlewares);
 
-    app.use("*", async (req, res, next) => {
+    app.get("*", async (req, res, next) => {
+      if (path.extname(req.path)) {
+        return next();
+      }
+
       try {
         const url = req.originalUrl;
         const templatePath = path.join(rootDir, "client", "index.html");
@@ -37,31 +34,44 @@ async function createApp() {
           url,
           await readFile(templatePath, "utf-8")
         );
-        res.status(200).set({ "Content-Type": "text/html" }).end(transformed);
+        return res.status(200).set({ "Content-Type": "text/html" }).end(transformed);
       } catch (error) {
         vite.ssrFixStacktrace(error);
-        next(error);
+        return next(error);
       }
     });
+
+    app.use((_req, res) => res.status(404).send("Not found"));
   } else {
     const distPath = path.join(rootDir, "dist");
     app.use(express.static(distPath));
-    app.use("*", (_req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+
+    app.get("*", (req, res, next) => {
+      if (path.extname(req.path)) {
+        return next();
+      }
+
+      return res.sendFile(path.join(distPath, "index.html"));
     });
+
+    app.use((_req, res) => res.status(404).send("Not found"));
   }
 
   return app;
 }
 
-createApp()
-  .then((app) => {
-    const port = Number(process.env.PORT ?? 3000);
-    app.listen(port, () => {
-      console.log(`Wellby listening on http://localhost:${port}`);
+const isDirectRun = Boolean(process.argv[1]) && path.resolve(process.argv[1]) === __filename;
+
+if (isDirectRun) {
+  createApp()
+    .then((app) => {
+      const port = Number(process.env.PORT ?? 3000);
+      app.listen(port, () => {
+        console.log(`Wellby listening on http://localhost:${port}`);
+      });
+    })
+    .catch((error) => {
+      console.error("Failed to start Wellby", error);
+      process.exit(1);
     });
-  })
-  .catch((error) => {
-    console.error("Failed to start Wellby", error);
-    process.exit(1);
-  });
+}
