@@ -236,7 +236,7 @@ export default function Dashboard({
           </div>
 
           <div className="space-y-6">
-            <BurnoutMeter burnRate={burnRate} />
+            <BurnoutMeter score={burnRate} />
 
             <div className="rounded-[28px] p-5 shadow-lg" style={{ background: colors.cardBg, border: `1px solid ${colors.cardBorder}` }}>
               <p className="text-sm font-bold uppercase tracking-[0.18em]" style={{ color: colors.muted }}>Break Recommendation</p>

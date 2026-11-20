@@ -1,13 +1,13 @@
 import { useContext, useMemo, useState } from "react";
 import { ThemeContext } from "../../context/ThemeContext.jsx";
+import { CARD_COLORS, resolvePlayedColor } from "../../lib/uno.js";
 
-const colors = ["red", "yellow", "green", "blue"];
 const numbers = Array.from({ length: 10 }, (_, value) => ({ type: "number", value }));
 const actions = [{ type: "skip" }, { type: "reverse" }, { type: "draw2" }];
 
 function buildDeck() {
   const deck = [];
-  colors.forEach((color) => {
+  CARD_COLORS.forEach((color) => {
     numbers.concat(actions).forEach((card) => {
       deck.push({ ...card, color, id: `${color}-${card.type}-${card.value ?? ""}-${Math.random()}` });
     });
@@ -122,7 +122,7 @@ export default function UnoGame({ onExit }) {
             next.players[player].pop();
             next.topCard = {
               ...drawn,
-              color: drawn.color === "wild" ? colors[Math.floor(Math.random() * colors.length)] : drawn.color
+              color: resolvePlayedColor(drawn)
             };
             applyCardEffect(next, next.topCard);
           } else {
@@ -133,7 +133,7 @@ export default function UnoGame({ onExit }) {
           next.players[player] = next.players[player].filter((card) => card.id !== playable.id);
           next.topCard = {
             ...playable,
-            color: playable.color === "wild" ? colors[Math.floor(Math.random() * colors.length)] : playable.color
+            color: resolvePlayedColor(playable)
           };
           applyCardEffect(next, next.topCard);
           if (next.players[player].length === 1) {
@@ -153,7 +153,7 @@ export default function UnoGame({ onExit }) {
     next.players[0] = next.players[0].filter((item) => item.id !== card.id);
     next.topCard = {
       ...card,
-      color: card.color === "wild" ? colors[Math.floor(Math.random() * colors.length)] : card.color
+      color: resolvePlayedColor(card)
     };
     applyCardEffect(next, next.topCard);
     if (next.players[0].length === 1) {
