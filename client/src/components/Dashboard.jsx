@@ -60,6 +60,7 @@ export default function Dashboard({
   onToggleFatigue,
   onStartBreak,
   onClearData,
+  feedbackUrl,
   banner,
   notificationState
 }) {
@@ -438,6 +439,17 @@ export default function Dashboard({
                     Clear my data
                   </button>
                 )}
+                {feedbackUrl ? (
+                  <a
+                    href={feedbackUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 block text-xs font-bold underline"
+                    style={{ color: colors.primary }}
+                  >
+                    Share feedback
+                  </a>
+                ) : null}
               </div>
             </div>
           </div>

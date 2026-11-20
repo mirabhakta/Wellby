@@ -9,6 +9,7 @@ import { STORAGE_KEYS } from "./lib/constants.js";
 import { useLocalStorage } from "./hooks/useLocalStorage.js";
 import { useBrowserFatigueDetection } from "./hooks/useBrowserFatigueDetection.js";
 import { clearWellbyStorage } from "./lib/storage.js";
+import { durationBucket, getFeedbackUrl, trackEvent } from "./lib/analytics.js";
 import { FORCED_BREAK_COOLDOWN_MS, SNOOZE_MS, getAlertAction, getForcedBreakCount, isHighReading, recordForcedBreak } from "./lib/alerts.js";
 import { calculateBurnoutScore } from "./lib/burnout.js";
 import {
@@ -346,14 +347,16 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [selfReportedAt]);
 
-  function startSession() {
+  function startSession(source = "manual") {
     setSession(createSession());
     setSelfReportedAt(0);
     wasHighRef.current = false;
     clearAllNotifications();
+    trackEvent("session_started", { source });
   }
 
   function handleClearData() {
+    trackEvent("data_cleared", {});
     clearWellbyStorage();
     window.location.reload();
   }
@@ -381,6 +384,13 @@ export default function App() {
     if (selfReport === "exhausted") {
       setSelfReportedAt(Date.now());
     }
+
+    trackEvent("session_ended", {
+      source,
+      duration: durationBucket(summary.durationSeconds),
+      selfReport: selfReport ?? "none",
+      baselineEligible: isBaselineEligible(summary)
+    });
   }
 
   function completeBreak() {
@@ -396,6 +406,10 @@ export default function App() {
         durationMinutes: Math.max(1, Math.round(breakDurationSeconds / 60))
       }
     ]);
+    trackEvent("break_completed", {
+      minutes: Math.max(1, Math.round(breakDurationSeconds / 60)),
+      reason: breakContext.reason
+    });
     lastBreakAtRef.current = Date.now();
     breakCreditRef.current = 0.1;
     setApiBurnRate((current) => Math.max(0, Number((current - 0.1).toFixed(2))));
@@ -425,6 +439,7 @@ export default function App() {
     }
 
     const now = Date.now();
+    const resuming = !session.active;
     setSession((current) => {
       const base = current.active ? current : createSession(now);
       return {
@@ -435,6 +450,10 @@ export default function App() {
         lastActionAt: now
       };
     });
+
+    if (resuming) {
+      trackEvent("session_started", { source: "activity" });
+    }
   }
 
   function handleTaskComplete() {
@@ -467,11 +486,17 @@ export default function App() {
       <OnboardingFlow
         onComplete={(nextProfile) => {
           setProfile(nextProfile);
-          startSession();
+          startSession("onboarding");
+          trackEvent("onboarding_completed", {
+            setup: nextProfile.setup,
+            seniority: nextProfile.seniority
+          });
         }}
       />
     );
   }
+
+  const feedbackUrl = getFeedbackUrl();
 
   const statusText = selfReportedActive
     ? "You told us you're running on empty. Treat the next block of work gently, or take the break."
@@ -496,22 +521,32 @@ export default function App() {
         onTaskInputChange={(value) => setSession((current) => ({ ...current, taskInput: value }))}
         onTaskStart={handleTaskStart}
         onTaskComplete={handleTaskComplete}
-        onStartSession={startSession}
+        onStartSession={() => startSession("manual")}
         onEndSession={(selfReport) => endSession({ source: "manual", selfReport })}
         onMoodSelect={(score) => {
           const now = Date.now();
+          const resuming = !session.active;
           setSession((current) => {
             const base = current.active ? current : createSession(now);
             return { ...base, moodScore: clampMoodScore(score), lastActionAt: now };
           });
+          if (resuming) {
+            trackEvent("session_started", { source: "activity" });
+          }
         }}
         mode={mode}
         onToggleMode={toggleMode}
         activeTheme={theme}
         onSetTheme={setTheme}
-        onToggleFatigue={() => setFatigueOptIn((current) => !current)}
+        onToggleFatigue={() => {
+          if (!fatigueOptIn) {
+            trackEvent("fatigue_optin", {});
+          }
+          setFatigueOptIn((current) => !current);
+        }}
         onStartBreak={() => triggerFullBreakMode({ noSnooze: false, reason: "manual" })}
         onClearData={handleClearData}
+        feedbackUrl={feedbackUrl}
         banner={banner}
         notificationState={notificationState}
       />
@@ -529,10 +564,15 @@ export default function App() {
         />
       ) : null}
       <footer
-        className="fixed bottom-0 left-0 right-0 px-4 py-3 text-center text-xs font-semibold"
+        className="fixed bottom-0 left-0 right-0 px-4 py-3 text-xs font-semibold"
         style={{ background: colors.sidebarBg, color: colors.wordmark }}
       >
-        Wellby is a wellness companion, not a substitute for professional mental health care.
+        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
+          <span>Wellby is a wellness companion, not a substitute for professional mental health care.</span>
+          <a href={feedbackUrl} target="_blank" rel="noreferrer" className="underline">
+            Share feedback
+          </a>
+        </div>
       </footer>
     </>
   );
