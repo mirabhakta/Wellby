@@ -219,7 +219,7 @@ This review doubles as the work list for the first PR
 (`fix/critical-defects`). Each item lands as its own commit.
 
 - [x] 1. Burnout meter reads the live score (prop contract + theme-aware card)
-- [ ] 2. Chess no longer crashes on illegal moves; error boundary added
+- [x] 2. Chess no longer crashes on illegal moves; error boundary added
 - [ ] 3. Forced-break cooldown so the modal cannot re-open immediately
 - [ ] 4. Post-break credit survives until the next server reading
 - [ ] 5. Snooze window and escalation tier actually fire

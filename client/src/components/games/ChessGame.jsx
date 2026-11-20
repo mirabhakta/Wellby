@@ -1,6 +1,7 @@
 import { useContext, useEffect, useMemo, useState } from "react";
 import { Chess } from "chess.js";
 import { ThemeContext } from "../../context/ThemeContext.jsx";
+import { tryMove } from "../../lib/chess.js";
 
 const pieceMap = {
   p: "♟",
@@ -122,13 +123,14 @@ export default function ChessGame({ onExit }) {
       return;
     }
 
-    const next = new Chess(game.fen());
-    const move = next.move({ from: selectedSquare, to: square, promotion: "q" });
+    const result = tryMove(game.fen(), selectedSquare, square);
 
-    if (!move) {
+    if (!result) {
       setSelectedSquare(square);
       return;
     }
+
+    const { game: next, move } = result;
 
     if (move.captured) {
       setCaptured((current) => ({
